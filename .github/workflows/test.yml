@@ -1,0 +1,55 @@
+name: Claude KVM Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      desktop:
+        image: dorowu/ubuntu-desktop-lxde-vnc
+        env:
+          RESOLUTION: 1920x1080
+          VNC_PASSWORD: claude-kvm-test
+        ports:
+          - 5900:5900
+        options: --shm-size=512m
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - name: Wait for VNC
+        run: |
+          for i in $(seq 1 30); do
+            nc -z localhost 5900 && echo "VNC ready" && exit 0
+            sleep 1
+          done
+          echo "VNC timeout" && exit 1
+
+      - name: Run Claude KVM
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VNC_HOST: localhost
+          VNC_PORT: 5900
+          VNC_AUTH: auto
+          VNC_PASSWORD: claude-kvm-test
+          SCREENSHOTS_DIR: screenshots
+          NODE_OPTIONS: --openssl-legacy-provider
+        run: cat .github/test-prompt.md | node index.js
+
+      - name: Save screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots/
+          if-no-files-found: ignore

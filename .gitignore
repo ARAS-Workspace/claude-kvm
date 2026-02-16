@@ -1,0 +1,27 @@
+#  █████╗ ██████╗  █████╗ ███████╗
+# ██╔══██╗██╔══██╗██╔══██╗██╔════╝
+# ███████║██████╔╝███████║███████╗
+# ██╔══██║██╔══██╗██╔══██║╚════██║
+# ██║  ██║██║  ██║██║  ██║███████║
+# ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
+
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Output Directories
+screenshots/
+
+# IDE - WebStorm & Development Tools
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+.claude/
+
+# Temporary files
+/tmp/
+*.ppm
