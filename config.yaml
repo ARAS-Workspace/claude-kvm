@@ -1,4 +1,4 @@
-# Display — screenshots are scaled down to this max dimension before sending to Claude
+# Display — screenshots are scaled down to this max dimension before sending to the client
 display:
   max_dimension: 1280
 
@@ -10,20 +10,11 @@ hid:
     min: 30
     max: 100
 
-# Claude API
-claude:
-  model: "claude-sonnet-4-5-20250929"
-  max_tokens: 4096
-  temperature: 0
-  system_prompt_file: "claude/prompt.md"
-
-# Agent Loop
-loop:
-  max_iterations: 25
+# Stable Frame Detection
+capture:
   screenshot_delay_ms: 500
   stable_frame_timeout_ms: 3000
   stable_frame_threshold: 0.5
-  history_window: 5
 
 # Frame Diff
 diff:

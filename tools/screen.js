@@ -13,21 +13,17 @@
  * Released under the MIT License — see LICENSE for details.
  */
 
-import { screenTools } from './screen.js';
-import { mouseTools } from './mouse.js';
-import { keyboardTools } from './keyboard.js';
-import { controlTools } from './control.js';
-
 /**
- * Aggregate all KVM tool definitions.
- * @param {import('../../lib/types.js').ScaledDisplay} display
- * @returns {import('@anthropic-ai/sdk').Tool[]}
+ * Screen/Video KVM tool definition.
+ *
+ * @returns {Array<{name: string, description: string, inputSchema: null}>}
  */
-export function getToolDefinitions(display) {
+export function screenTools() {
   return [
-    ...screenTools(),
-    ...mouseTools(display),
-    ...keyboardTools(),
-    ...controlTools(),
+    {
+      name: 'screenshot',
+      description: 'Capture the full screen. Use to observe current state before acting.',
+      inputSchema: null,
+    },
   ];
 }

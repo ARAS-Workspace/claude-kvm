@@ -1,7 +1,7 @@
 {
   "name": "claude-kvm",
   "version": "1.0.0",
-  "description": "AI-driven KVM agent — Claude controls remote desktops via VNC",
+  "description": "MCP server — control remote desktops via VNC",
   "license": "MIT",
   "main": "index.js",
   "type": "module",
@@ -9,9 +9,12 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
-    "dotenv": "^16.4.7",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "sharp": "^0.33.5",
-    "yaml": "^2.7.0"
+    "yaml": "^2.7.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3"
   }
 }

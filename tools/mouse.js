@@ -13,11 +13,13 @@
  * Released under the MIT License — see LICENSE for details.
  */
 
+import { z } from 'zod';
+
 /**
  * Mouse instrument definition.
  *
- * @param {import('../../lib/types.js').ScaledDisplay} display
- * @returns {import('@anthropic-ai/sdk').Tool[]}
+ * @param {import('../lib/types.js').ScaledDisplay} display
+ * @returns {Array<{name: string, description: string, inputSchema: Record<string, import('zod').ZodType>}>}
  */
 export function mouseTools(display) {
   const { width, height } = display;
@@ -39,21 +41,14 @@ export function mouseTools(display) {
         '- scroll: Scroll at current position.',
         '- peek: View crop around cursor without acting.',
       ].join('\n'),
-      input_schema: {
-        type: 'object',
-        properties: {
-          action: {
-            type: 'string',
-            enum: ['move', 'nudge', 'click', 'click_at', 'right_click', 'double_click', 'drag', 'scroll', 'peek'],
-          },
-          x: { type: 'integer', minimum: 0, maximum: width - 1, description: 'X coordinate. For: move, click_at, drag.' },
-          y: { type: 'integer', minimum: 0, maximum: height - 1, description: 'Y coordinate. For: move, click_at, drag.' },
-          dx: { type: 'integer', minimum: -20, maximum: 20, description: 'Horizontal offset. For: nudge.' },
-          dy: { type: 'integer', minimum: -20, maximum: 20, description: 'Vertical offset. For: nudge.' },
-          direction: { type: 'string', enum: ['up', 'down', 'left', 'right'], description: 'For: scroll.' },
-          amount: { type: 'integer', minimum: 1, maximum: 10, description: 'Scroll steps. For: scroll.' },
-        },
-        required: ['action'],
+      inputSchema: {
+        action: z.enum(['move', 'nudge', 'click', 'click_at', 'right_click', 'double_click', 'drag', 'scroll', 'peek']),
+        x: z.number().int().min(0).max(width - 1).describe('X coordinate. For: move, click_at, drag.').optional(),
+        y: z.number().int().min(0).max(height - 1).describe('Y coordinate. For: move, click_at, drag.').optional(),
+        dx: z.number().int().min(-20).max(20).describe('Horizontal offset. For: nudge.').optional(),
+        dy: z.number().int().min(-20).max(20).describe('Vertical offset. For: nudge.').optional(),
+        direction: z.enum(['up', 'down', 'left', 'right']).describe('For: scroll.').optional(),
+        amount: z.number().int().min(1).max(10).describe('Scroll steps. For: scroll.').optional(),
       },
     },
   ];

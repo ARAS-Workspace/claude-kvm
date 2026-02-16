@@ -8,8 +8,9 @@
 # Dependencies
 node_modules/
 
-# Environment variables
+# Environment variables & MCP config (contains credentials)
 .env
+.mcp.json
 
 # Output Directories
 screenshots/

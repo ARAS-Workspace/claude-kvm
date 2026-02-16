@@ -13,10 +13,12 @@
  * Released under the MIT License — see LICENSE for details.
  */
 
+import { z } from 'zod';
+
 /**
  * Keyboard instrument definition.
  *
- * @returns {import('@anthropic-ai/sdk').Tool[]}
+ * @returns {Array<{name: string, description: string, inputSchema: Record<string, import('zod').ZodType>}>}
  */
 export function keyboardTools() {
   return [
@@ -33,18 +35,11 @@ export function keyboardTools() {
         '  Modifiers: ctrl, alt, shift, meta. Examples: ctrl+c, ctrl+l.',
         '- type: Type text character by character. Param: text.',
       ].join('\n'),
-      input_schema: {
-        type: 'object',
-        properties: {
-          action: {
-            type: 'string',
-            enum: ['press', 'combo', 'type'],
-          },
-          key: { type: 'string', description: 'Key name. For: press.' },
-          keys: { type: 'string', description: 'Key combo (e.g. "ctrl+c"). For: combo.' },
-          text: { type: 'string', description: 'Text to type. For: type.' },
-        },
-        required: ['action'],
+      inputSchema: {
+        action: z.enum(['press', 'combo', 'type']),
+        key: z.string().describe('Key name. For: press.').optional(),
+        keys: z.string().describe('Key combo (e.g. "ctrl+c"). For: combo.').optional(),
+        text: z.string().describe('Text to type. For: type.').optional(),
       },
     },
   ];

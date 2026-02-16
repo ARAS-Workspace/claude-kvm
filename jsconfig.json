@@ -5,7 +5,8 @@
     "target": "ESNext",
     "checkJs": true,
     "strict": false,
-    "baseUrl": "."
+    "baseUrl": ".",
+    "types": ["node"]
   },
   "include": ["**/*.js"],
   "exclude": ["node_modules"]

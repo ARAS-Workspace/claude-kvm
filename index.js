@@ -13,14 +13,14 @@
  * Released under the MIT License — see LICENSE for details.
  */
 
-import 'dotenv/config';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { parse as parseYaml } from 'yaml';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { VNCClient } from './lib/vnc.js';
 import { HIDController } from './lib/hid.js';
 import { ScreenCapture } from './lib/capture.js';
-import { ClaudeClient } from './claude/client.js';
-import { getToolDefinitions } from './claude/tools/index.js';
+import { getToolDefinitions } from './tools/index.js';
 
 // ── Load Configuration ──────────────────────────────────────
 
@@ -40,14 +40,6 @@ function saveScreenshot(base64, label) {
   writeFileSync(`${SCREENSHOTS_DIR}/${name}`, Buffer.from(base64, 'base64'));
 }
 
-/** Read task from stdin (pipe) */
-async function readTask() {
-  if (process.stdin.isTTY) return 'Describe what you see on the screen.';
-  const chunks = [];
-  for await (const chunk of process.stdin) chunks.push(chunk);
-  return Buffer.concat(chunks).toString('utf-8').trim();
-}
-
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -56,17 +48,17 @@ function sleep(ms) {
 
 /** Native resolution (from VNC) */
 let native = { width: 0, height: 0 };
-/** Scaled resolution (what Claude sees) */
+/** Scaled resolution (what the client sees) */
 let scaled = { width: 0, height: 0 };
 
-/** Scale Claude's coordinates → native */
+/** Scale client coordinates → native */
 function toNative(x, y) {
   const sx = native.width / scaled.width;
   const sy = native.height / scaled.height;
   return { x: Math.round(x * sx), y: Math.round(y * sy) };
 }
 
-/** Scale native cursor position → Claude's coordinate space */
+/** Scale native cursor position → client coordinate space */
 function toScaled(pos) {
   const sx = scaled.width / native.width;
   const sy = scaled.height / native.height;
@@ -151,13 +143,50 @@ async function executeTool(name, input, hid, capture) {
   return { resultText: `Unknown tool: ${name}`, shouldCapture: false, done: false };
 }
 
-// ── Main ────────────────────────────────────────────────────
+// ── Tool Call Handler ───────────────────────────────────────
+
+/**
+ * @param {string} name
+ * @param {Record<string, any>} args
+ * @param {HIDController} hid
+ * @param {ScreenCapture} capture
+ * @returns {Promise<import('@modelcontextprotocol/sdk/types.js').CallToolResult>}
+ */
+async function handleToolCall(name, args, hid, capture) {
+  console.error(`[tool] ${name}(${JSON.stringify(args)})`);
+
+  let result;
+  try {
+    result = await executeTool(name, args, hid, capture);
+  } catch (err) {
+    console.error(`Error: ${err.message}`);
+    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+  }
+
+  /** @type {Array<{type: string, text?: string, data?: string, mimeType?: string}>} */
+  const content = [{ type: 'text', text: result.resultText }];
+
+  if (result.shouldCapture) {
+    const stable = await capture.captureStableFrame();
+    saveScreenshot(stable.base64, name);
+
+    if (stable.diff && CLICK_ACTIONS.has(args?.action) && stable.diff.changePercent < config.diff.change_percent_threshold) {
+      content[0].text += ' WARNING: Screen unchanged — click may have missed.';
+    }
+
+    content.push({ type: 'image', data: stable.base64, mimeType: 'image/png' });
+  }
+
+  if (result.cursorCropBase64) {
+    content.push({ type: 'image', data: result.cursorCropBase64, mimeType: 'image/png' });
+  }
+
+  return { content };
+}
+
+// ── MCP Server ──────────────────────────────────────────────
 
 async function main() {
-  const task = await readTask();
-  console.log('Claude KVM starting...');
-  console.log(`Task: ${task}`);
-
   // 1. Connect to VNC
   /** @type {import('./lib/types.js').VNCConnectionConfig} */
   const vncConfig = {
@@ -169,9 +198,9 @@ async function main() {
   };
 
   const vnc = new VNCClient(vncConfig);
-  console.log(`Connecting to VNC: ${vncConfig.host}:${vncConfig.port} (auth: ${vncConfig.auth})`);
+  console.error(`Connecting to VNC: ${vncConfig.host}:${vncConfig.port} (auth: ${vncConfig.auth})`);
   const serverInfo = await vnc.connect();
-  console.log(`VNC connected: ${serverInfo.name} (${serverInfo.width}x${serverInfo.height})`);
+  console.error(`VNC connected: ${serverInfo.name} (${serverInfo.width}x${serverInfo.height})`);
 
   // 2. Compute scaled display
   native = { width: serverInfo.width, height: serverInfo.height };
@@ -179,76 +208,41 @@ async function main() {
   const ratio = Math.min(maxDim / native.width, maxDim / native.height, 1);
   scaled = { width: Math.round(native.width * ratio), height: Math.round(native.height * ratio) };
 
-  console.log(`Display: ${native.width}x${native.height} → ${scaled.width}x${scaled.height} (×${ratio.toFixed(3)})`);
+  console.error(`Display: ${native.width}x${native.height} → ${scaled.width}x${scaled.height} (×${ratio.toFixed(3)})`);
 
   // 3. Initialize
   const hid = new HIDController(config, vnc);
   const capture = new ScreenCapture(config, vnc, native, scaled);
   const tools = getToolDefinitions(scaled);
 
-  const systemPrompt = readFileSync(config.claude.system_prompt_file, 'utf-8')
-    .replace(/\{width}/g, String(scaled.width))
-    .replace(/\{height}/g, String(scaled.height));
+  // 4. Create MCP server
+  const mcpServer = new McpServer(
+    { name: 'claude-kvm', version: '1.0.0' },
+    { capabilities: { tools: {} } },
+  );
 
-  // 4. Initial screenshot
-  console.log('Taking initial screenshot...');
-  await capture.captureWithDiff();
-  const initialCapture = await capture.captureStableFrame();
-  saveScreenshot(initialCapture.base64, 'initial');
-
-  // 5. Agent loop
-  const claudeClient = new ClaudeClient(config, systemPrompt, tools, scaled);
-  let response = await claudeClient.sendInitialMessage(initialCapture.base64, task);
-
-  for (let iteration = 1; iteration <= config.loop.max_iterations; iteration++) {
-    const text = ClaudeClient.extractText(response);
-    if (text) console.log(`\n[Claude] ${text}`);
-
-    const toolUses = ClaudeClient.extractToolUses(response);
-    if (toolUses.length === 0) break;
-
-    for (const toolUse of toolUses) {
-      console.log(`[${iteration}] ${toolUse.name}(${JSON.stringify(toolUse.input)})`);
-
-      let result;
-      try {
-        result = await executeTool(toolUse.name, toolUse.input, hid, capture);
-      } catch (err) {
-        console.error(`Error: ${err.message}`);
-        result = { resultText: `Error: ${err.message}`, shouldCapture: true, done: false };
-      }
-
-      if (result.done) {
-        console.log(`\n[${(result.status || 'success').toUpperCase()}] ${result.summary}`);
-        vnc.disconnect();
-        return;
-      }
-
-      let screenshotBase64 = null;
-      let diff = null;
-
-      if (result.shouldCapture) {
-        const stable = await capture.captureStableFrame();
-        screenshotBase64 = stable.base64;
-        diff = stable.diff;
-        saveScreenshot(screenshotBase64, `${iteration}-${toolUse.name}`);
-
-        if (diff && CLICK_ACTIONS.has(toolUse.input?.action) && diff.changePercent < config.diff.change_percent_threshold) {
-          result.resultText += ' WARNING: Screen unchanged — click may have missed.';
-        }
-      }
-
-      const extraImages = [];
-      if (result.cursorCropBase64) {
-        extraImages.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: result.cursorCropBase64 } });
-      }
-
-      response = await claudeClient.sendToolResult(toolUse.id, result.resultText, screenshotBase64, diff, iteration, config.loop.max_iterations, extraImages);
+  // Register tools
+  for (const tool of tools) {
+    if (tool.inputSchema) {
+      mcpServer.registerTool(tool.name, {
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+      }, async (args) => handleToolCall(tool.name, args, hid, capture));
+    } else {
+      mcpServer.registerTool(tool.name, {
+        description: tool.description,
+      }, async () => handleToolCall(tool.name, {}, hid, capture));
     }
   }
 
-  console.log('\nMax iterations reached.');
-  vnc.disconnect();
+  // 5. Start MCP transport
+  const transport = new StdioServerTransport();
+  await mcpServer.connect(transport);
+  console.error('Claude KVM MCP server running on stdio');
+
+  // Graceful shutdown
+  process.on('SIGINT', () => { vnc.disconnect(); process.exit(0); });
+  process.on('SIGTERM', () => { vnc.disconnect(); process.exit(0); });
 }
 
 main().catch(err => { console.error('Fatal:', err); process.exit(1); });

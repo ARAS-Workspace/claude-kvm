@@ -13,43 +13,33 @@
  * Released under the MIT License — see LICENSE for details.
  */
 
+import { z } from 'zod';
+
 /**
  * Flow control tool definitions.
- * @returns {import('@anthropic-ai/sdk').Tool[]}
+ * @returns {Array<{name: string, description: string, inputSchema: Record<string, import('zod').ZodType>}>}
  */
 export function controlTools() {
   return [
     {
       name: 'wait',
       description: 'Wait before the next action. Use when waiting for a page load, animation, or response.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          ms: { type: 'integer', description: 'Duration in milliseconds (100–5000)', minimum: 100, maximum: 5000 },
-        },
-        required: ['ms'],
+      inputSchema: {
+        ms: z.number().int().min(100).max(5000).describe('Duration in milliseconds (100–5000)'),
       },
     },
     {
       name: 'task_complete',
       description: 'Mark the task as successfully completed. Provide a brief summary.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          summary: { type: 'string', description: 'What was accomplished' },
-        },
-        required: ['summary'],
+      inputSchema: {
+        summary: z.string().describe('What was accomplished'),
       },
     },
     {
       name: 'task_failed',
       description: 'Mark the task as failed. Explain why.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          reason: { type: 'string', description: 'Why the task could not be completed' },
-        },
-        required: ['reason'],
+      inputSchema: {
+        reason: z.string().describe('Why the task could not be completed'),
       },
     },
   ];
