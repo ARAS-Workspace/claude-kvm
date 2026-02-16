@@ -14,8 +14,7 @@
  * Released under the MIT License — see LICENSE for details.
  */
 
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { parse as parseYaml } from 'yaml';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { VNCClient } from './lib/vnc.js';
@@ -23,10 +22,37 @@ import { HIDController } from './lib/hid.js';
 import { ScreenCapture } from './lib/capture.js';
 import { getToolDefinitions } from './tools/index.js';
 
-// ── Load Configuration ──────────────────────────────────────
+// ── Load Configuration (from environment variables) ─────────
+
+const env = (key, fallback) => process.env[key] ?? fallback;
+const envInt = (key, fallback) => parseInt(env(key, String(fallback)), 10);
+const envFloat = (key, fallback) => parseFloat(env(key, String(fallback)));
+const envBool = (key, fallback) => env(key, String(fallback)) === 'true';
 
 /** @type {import('./lib/types.js').ClaudeKVMConfig} */
-const config = parseYaml(readFileSync('config.yaml', 'utf-8'));
+const config = {
+  display: {
+    max_dimension: envInt('DISPLAY_MAX_DIMENSION', 1280),
+  },
+  hid: {
+    click_hold_ms: envInt('HID_CLICK_HOLD_MS', 80),
+    key_hold_ms: envInt('HID_KEY_HOLD_MS', 50),
+    typing_delay_ms: {
+      min: envInt('HID_TYPING_DELAY_MIN_MS', 30),
+      max: envInt('HID_TYPING_DELAY_MAX_MS', 100),
+    },
+  },
+  capture: {
+    screenshot_delay_ms: envInt('CAPTURE_SCREENSHOT_DELAY_MS', 500),
+    stable_frame_timeout_ms: envInt('CAPTURE_STABLE_FRAME_TIMEOUT_MS', 3000),
+    stable_frame_threshold: envFloat('CAPTURE_STABLE_FRAME_THRESHOLD', 0.5),
+  },
+  diff: {
+    enabled: envBool('DIFF_ENABLED', true),
+    pixel_threshold: envInt('DIFF_PIXEL_THRESHOLD', 30),
+    change_percent_threshold: envFloat('DIFF_CHANGE_PERCENT_THRESHOLD', 0.5),
+  },
+};
 
 // ── Screenshot Saving (CI) ──────────────────────────────────
 
