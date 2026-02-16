@@ -4,6 +4,9 @@
   "description": "MCP server — control remote desktops via VNC",
   "license": "MIT",
   "main": "index.js",
+  "bin": {
+    "claude-kvm": "index.js"
+  },
   "type": "module",
   "scripts": {
     "start": "node index.js"
