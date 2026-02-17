@@ -75,6 +75,7 @@ jobs:
           SCREENSHOTS_DIR: ./test-screenshots
           MODEL: ${{ inputs.model || 'claude-sonnet-4-5-20250929' }}
           MAX_TURNS: ${{ inputs.max_turns || '30' }}
+          NODE_OPTIONS: --openssl-legacy-provider
         run: |
           mkdir -p test-screenshots
           node test/integration.js
