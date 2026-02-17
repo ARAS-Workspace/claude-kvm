@@ -10,6 +10,9 @@
 name: Integration Test
 
 on:
+  push:
+    tags:
+      - 'test-v*'
   workflow_dispatch:
     inputs:
       model:

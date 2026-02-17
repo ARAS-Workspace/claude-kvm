@@ -43,6 +43,7 @@ export function keyboardTools() {
         '- Use meta+w to close windows/tabs, meta+a to select all.',
         '- Chain keyboard actions without screenshots between them — verify with diff_check at the end.',
         '- paste is preferred over type for longer text. Both support Unicode and special characters.',
+        '- On macOS, paste falls back to typing character-by-character (VNC clipboard limitation).',
       ].join('\n'),
       inputSchema: {
         action: z.enum(['press', 'combo', 'type', 'paste']),

@@ -40,12 +40,15 @@ const config = {
       min: envInt('HID_TYPING_DELAY_MIN_MS', 30),
       max: envInt('HID_TYPING_DELAY_MAX_MS', 100),
     },
+    scroll_events_per_step: envInt('HID_SCROLL_EVENTS_PER_STEP', 5),
   },
-  capture: {
-    stable_frame_threshold: envFloat('CAPTURE_STABLE_FRAME_THRESHOLD', 0.5),
-  },
+  capture: {},
   diff: {
     pixel_threshold: envInt('DIFF_PIXEL_THRESHOLD', 30),
+  },
+  vnc_timeouts: {
+    connect_timeout_ms: envInt('VNC_CONNECT_TIMEOUT_MS', 10000),
+    screenshot_timeout_ms: envInt('VNC_SCREENSHOT_TIMEOUT_MS', 3000),
   },
 };
 
@@ -73,6 +76,17 @@ let native = { width: 0, height: 0 };
 /** Scaled resolution (what the client sees) */
 let scaled = { width: 0, height: 0 };
 
+// ── Module-level State (populated by connectVNC) ────────
+
+/** @type {import('./lib/vnc.js').VNCClient | null} */
+let vnc = null;
+/** @type {import('./lib/hid.js').HIDController | null} */
+let hid = null;
+/** @type {import('./lib/capture.js').ScreenCapture | null} */
+let capture = null;
+/** @type {number | null} */
+let startTime = null;
+
 /** Scale client coordinates → native */
 function toNative(x, y) {
   const sx = native.width / scaled.width;
@@ -92,6 +106,7 @@ function toScaled(pos) {
 /** @type {Record<string, (input: Record<string, any>, hid: HIDController) => Promise<void>>} */
 const MOUSE_EXEC = {
   move:         async (i, h) => { const p = toNative(i.x, i.y); await h.mouseMove(p.x, p.y); },
+  hover:        async (i, h) => { const p = toNative(i.x, i.y); await h.mouseMove(p.x, p.y); await sleep(400); },
   nudge:        async (i, h) => {
     const p = h.getCursorPosition();
     const sx = native.width / scaled.width;
@@ -124,14 +139,35 @@ const KEYBOARD_EXEC = {
 /**
  * @param {string} name
  * @param {Record<string, any>} input
- * @param {HIDController} hid
- * @param {ScreenCapture} capture
  * @returns {Promise<import('./lib/types.js').ToolExecResult>}
  */
-async function executeTool(name, input, hid, capture) {
+async function executeTool(name, input) {
   // ── Terminal ──
   if (name === 'task_complete') return { text: input.summary, done: true, status: 'success' };
   if (name === 'task_failed') return { text: input.reason, done: true, status: 'failed' };
+
+  // ── Health Check (works even when VNC is down) ──
+  if (name === 'health_check') {
+    const isConnected = vnc?.connected && vnc?.ready;
+    const info = {
+      status: vnc?.reconnecting ? 'reconnecting' : isConnected ? 'connected' : 'disconnected',
+      resolution: isConnected ? `${native.width}x${native.height}` : null,
+      scaled: isConnected ? `${scaled.width}x${scaled.height}` : null,
+      server: isConnected ? vnc.serverName : null,
+      macOS: isConnected ? vnc.isMacOS : null,
+      uptime: startTime ? Math.floor((Date.now() - startTime) / 1000) + 's' : null,
+      reconnectCount: vnc?.reconnectCount ?? 0,
+      lastScreenshotMs: capture?.lastScreenshotMs ?? null,
+      memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+    };
+    return { text: JSON.stringify(info, null, 2) };
+  }
+
+  // ── VNC Readiness Gate ──
+  if (!vnc?.ready) {
+    const state = vnc?.reconnecting ? 'reconnecting' : 'connecting';
+    return { text: `VNC ${state}... retry in a few seconds.` };
+  }
 
   // ── Screen Instruments ──
   if (name === 'screenshot') {
@@ -150,7 +186,7 @@ async function executeTool(name, input, hid, capture) {
 
   if (name === 'diff_check') {
     const result = await capture.quickDiffCheck();
-    return { text: `changeDetected: ${result.changeDetected}, changePercent: ${result.changePercent.toFixed(2)}%` };
+    return { text: `changeDetected: ${result.changeDetected}` };
   }
 
   if (name === 'set_baseline') {
@@ -189,16 +225,14 @@ async function executeTool(name, input, hid, capture) {
 /**
  * @param {string} name
  * @param {Record<string, any>} args
- * @param {HIDController} hid
- * @param {ScreenCapture} capture
  * @returns {Promise<import('@modelcontextprotocol/sdk/types.js').CallToolResult>}
  */
-async function handleToolCall(name, args, hid, capture) {
+async function handleToolCall(name, args) {
   console.error(`[tool] ${name}(${JSON.stringify(args)})`);
 
   let result;
   try {
-    result = await executeTool(name, args, hid, capture);
+    result = await executeTool(name, args);
   } catch (err) {
     console.error(`Error: ${err.message}`);
     return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
@@ -216,8 +250,65 @@ async function handleToolCall(name, args, hid, capture) {
 
 // ── MCP Server ──────────────────────────────────────────────
 
+/**
+ * Initialize display scaling and HID/Capture controllers after VNC connects.
+ * @param {import('./lib/types.js').VNCServerInfo} serverInfo
+ */
+function initializeDisplay(serverInfo) {
+  native = { width: serverInfo.width, height: serverInfo.height };
+  const maxDim = config.display?.max_dimension || 1280;
+  const ratio = Math.min(maxDim / native.width, maxDim / native.height, 1);
+  scaled = { width: Math.round(native.width * ratio), height: Math.round(native.height * ratio) };
+
+  console.error(`Display: ${native.width}x${native.height} → ${scaled.width}x${scaled.height} (×${ratio.toFixed(3)})`);
+
+  hid = new HIDController(config, vnc);
+  capture = new ScreenCapture(config, vnc, native, scaled);
+  startTime = Date.now();
+}
+
+/**
+ * Connect to VNC with retry logic. Non-blocking — fires and forgets.
+ * @param {import('./lib/types.js').VNCConnectionConfig} vncConfig
+ * @param {number} [maxRetries=3]
+ */
+async function connectVNC(vncConfig, maxRetries = 3) {
+  vnc = new VNCClient(vncConfig, {
+    connectTimeoutMs: config.vnc_timeouts.connect_timeout_ms,
+    screenshotTimeoutMs: config.vnc_timeouts.screenshot_timeout_ms,
+  });
+
+  // Handle reconnects — reinitialize display/HID/capture
+  vnc.on('reconnected', (info) => {
+    console.error(`VNC reconnected: ${info.name} (${info.width}x${info.height})`);
+    initializeDisplay(info);
+  });
+
+  vnc.on('reconnect-failed', () => {
+    console.error('VNC reconnect failed — all attempts exhausted');
+  });
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.error(`Connecting to VNC: ${vncConfig.host}:${vncConfig.port} (attempt ${attempt}/${maxRetries})`);
+      const serverInfo = await vnc.connect();
+      console.error(`VNC connected: ${serverInfo.name} (${serverInfo.width}x${serverInfo.height}) macOS=${vnc.isMacOS}`);
+      initializeDisplay(serverInfo);
+      return;
+    } catch (err) {
+      console.error(`VNC connect attempt ${attempt} failed: ${err.message}`);
+      if (attempt < maxRetries) {
+        const delay = 2000 * attempt;
+        console.error(`Retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+  console.error('VNC initial connection failed — tools will return retry hints until connected');
+}
+
 async function main() {
-  // 1. Connect to VNC
+  // 1. VNC config
   /** @type {import('./lib/types.js').VNCConnectionConfig} */
   const vncConfig = {
     host: process.env.VNC_HOST || '127.0.0.1',
@@ -227,52 +318,40 @@ async function main() {
     password: process.env.VNC_PASSWORD || '',
   };
 
-  const vnc = new VNCClient(vncConfig);
-  console.error(`Connecting to VNC: ${vncConfig.host}:${vncConfig.port} (auth: ${vncConfig.auth})`);
-  const serverInfo = await vnc.connect();
-  console.error(`VNC connected: ${serverInfo.name} (${serverInfo.width}x${serverInfo.height}) macOS=${vnc.isMacOS}`);
+  // 2. Create MCP server and register tools FIRST (before VNC connects)
+  //    Use a generous default display size — will be updated once VNC connects
+  const defaultDisplay = { width: config.display?.max_dimension || 1280, height: 800 };
+  const tools = getToolDefinitions(defaultDisplay);
 
-  // 2. Compute scaled display
-  native = { width: serverInfo.width, height: serverInfo.height };
-  const maxDim = config.display?.max_dimension || 1280;
-  const ratio = Math.min(maxDim / native.width, maxDim / native.height, 1);
-  scaled = { width: Math.round(native.width * ratio), height: Math.round(native.height * ratio) };
-
-  console.error(`Display: ${native.width}x${native.height} → ${scaled.width}x${scaled.height} (×${ratio.toFixed(3)})`);
-
-  // 3. Initialize
-  const hid = new HIDController(config, vnc);
-  const capture = new ScreenCapture(config, vnc, native, scaled);
-  const tools = getToolDefinitions(scaled);
-
-  // 4. Create MCP server
   const mcpServer = new McpServer(
-    { name: 'claude-kvm', version: '1.0.0' },
+    { name: 'claude-kvm', version: '1.0.2' },
     { capabilities: { tools: {} } },
   );
 
-  // Register tools
   for (const tool of tools) {
     if (tool.inputSchema) {
       mcpServer.registerTool(tool.name, {
         description: tool.description,
         inputSchema: tool.inputSchema,
-      }, async (args) => handleToolCall(tool.name, args, hid, capture));
+      }, async (args) => handleToolCall(tool.name, args));
     } else {
       mcpServer.registerTool(tool.name, {
         description: tool.description,
-      }, async () => handleToolCall(tool.name, {}, hid, capture));
+      }, async () => handleToolCall(tool.name, {}));
     }
   }
 
-  // 5. Start MCP transport
+  // 3. Start MCP transport IMMEDIATELY (no VNC dependency)
   const transport = new StdioServerTransport();
   await mcpServer.connect(transport);
   console.error('Claude KVM MCP server running on stdio');
 
+  // 4. Connect to VNC in background (non-blocking)
+  connectVNC(vncConfig);
+
   // Graceful shutdown
-  process.on('SIGINT', () => { vnc.disconnect(); process.exit(0); });
-  process.on('SIGTERM', () => { vnc.disconnect(); process.exit(0); });
+  process.on('SIGINT', () => { vnc?.disconnect(); process.exit(0); });
+  process.on('SIGTERM', () => { vnc?.disconnect(); process.exit(0); });
 }
 
 main().catch(err => { console.error('Fatal:', err); process.exit(1); });

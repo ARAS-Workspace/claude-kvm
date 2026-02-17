@@ -29,6 +29,15 @@ export function controlTools() {
       },
     },
     {
+      name: 'health_check',
+      description: [
+        'Check VNC connection status and server info.',
+        'Returns connection state, resolution, latency, reconnect count, and memory usage.',
+        'Use when you suspect the connection may be unstable or to diagnose issues.',
+      ].join('\n'),
+      inputSchema: null,
+    },
+    {
       name: 'task_complete',
       description: 'Mark the task as successfully completed. Provide a brief summary.',
       inputSchema: {

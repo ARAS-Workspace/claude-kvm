@@ -29,6 +29,7 @@ export function screenTools() {
         '- Verify a complex visual result (page loaded, UI changed significantly)',
         '- Read text or identify UI elements for the next action',
         'For simple verifications, prefer diff_check (text-only, ~5ms) or cursor_crop (small image).',
+        'If you need to read text from the screen, take a screenshot and examine the image carefully.',
       ].join('\n'),
       inputSchema: null,
     },
@@ -46,7 +47,8 @@ export function screenTools() {
       name: 'diff_check',
       description: [
         'Lightweight screen change detection. Compares current frame against the baseline.',
-        'Returns change percentage as text — no image. Fast (~5-10ms).',
+        'Returns changeDetected: true/false — no image. Fast (~5ms).',
+        'Triggers on any pixel change — maximum sensitivity.',
         'Use after actions to verify if something changed without the cost of a full screenshot.',
         'Updates the baseline after comparison.',
         'Typical workflow: set_baseline → action → diff_check → if changed, screenshot only if needed.',
