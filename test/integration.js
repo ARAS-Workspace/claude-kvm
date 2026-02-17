@@ -93,10 +93,11 @@ async function main() {
   const anthropic = new Anthropic();
 
   const systemPrompt = [
-    'You are controlling a macOS computer via VNC KVM tools.',
+    'You are controlling a remote computer via VNC and SSH KVM tools.',
     'Complete the given task efficiently.',
     'Minimize unnecessary screenshots — use diff_check to verify simple changes.',
     'Prefer click_at over move+click. Use keyboard shortcuts when possible.',
+    'Use the ssh tool for shell commands, process verification, and system info.',
     'When done, call task_complete. If stuck after multiple attempts, call task_failed.',
   ].join(' ');
 

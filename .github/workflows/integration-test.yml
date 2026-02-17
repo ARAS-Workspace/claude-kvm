@@ -46,6 +46,7 @@ jobs:
           VNC_PASSWORD: testpass
         ports:
           - 5900:5900
+          - 2222:22
         options: --shm-size=512m
 
     steps:
@@ -68,6 +69,24 @@ jobs:
           done
           echo "VNC timeout" && exit 1
 
+      - name: Setup SSH in desktop container
+        run: |
+          CONTAINER_ID=$(docker ps -q --filter "ancestor=dorowu/ubuntu-desktop-lxde-vnc")
+          docker exec $CONTAINER_ID bash -c "
+            rm -f /etc/apt/sources.list.d/google-chrome.list &&
+            apt-get update -qq &&
+            apt-get install -y -qq openssh-server &&
+            mkdir -p /run/sshd &&
+            echo 'root:testpass' | chpasswd &&
+            sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config &&
+            /usr/sbin/sshd
+          "
+          for i in $(seq 1 15); do
+            nc -z localhost 2222 && echo "SSH ready" && exit 0
+            sleep 1
+          done
+          echo "SSH timeout" && exit 1
+
       - name: Run integration test
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -75,6 +94,10 @@ jobs:
           VNC_PORT: 5900
           VNC_AUTH: auto
           VNC_PASSWORD: testpass
+          SSH_HOST: localhost
+          SSH_PORT: 2222
+          SSH_USER: root
+          SSH_PASSWORD: testpass
           SCREENSHOTS_DIR: ./test-screenshots
           MODEL: ${{ inputs.model || 'claude-sonnet-4-5-20250929' }}
           MAX_TURNS: ${{ inputs.max_turns || '30' }}

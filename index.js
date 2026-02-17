@@ -20,13 +20,13 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { VNCClient } from './lib/vnc.js';
 import { HIDController } from './lib/hid.js';
 import { ScreenCapture } from './lib/capture.js';
+import { SSHClient } from './lib/ssh.js';
 import { getToolDefinitions } from './tools/index.js';
 
 // ── Load Configuration (from environment variables) ─────────
 
 const env = (key, fallback) => process.env[key] ?? fallback;
 const envInt = (key, fallback) => parseInt(env(key, String(fallback)), 10);
-const envFloat = (key, fallback) => parseFloat(env(key, String(fallback)));
 
 /** @type {import('./lib/types.js').ClaudeKVMConfig} */
 const config = {
@@ -84,6 +84,8 @@ let vnc = null;
 let hid = null;
 /** @type {import('./lib/capture.js').ScreenCapture | null} */
 let capture = null;
+/** @type {import('./lib/ssh.js').SSHClient | null} */
+let ssh = null;
 /** @type {number | null} */
 let startTime = null;
 
@@ -150,17 +152,39 @@ async function executeTool(name, input) {
   if (name === 'health_check') {
     const isConnected = vnc?.connected && vnc?.ready;
     const info = {
-      status: vnc?.reconnecting ? 'reconnecting' : isConnected ? 'connected' : 'disconnected',
-      resolution: isConnected ? `${native.width}x${native.height}` : null,
-      scaled: isConnected ? `${scaled.width}x${scaled.height}` : null,
-      server: isConnected ? vnc.serverName : null,
-      macOS: isConnected ? vnc.isMacOS : null,
+      vnc: {
+        status: vnc?.reconnecting ? 'reconnecting' : isConnected ? 'connected' : 'disconnected',
+        resolution: isConnected ? `${native.width}x${native.height}` : null,
+        scaled: isConnected ? `${scaled.width}x${scaled.height}` : null,
+        server: isConnected ? vnc.serverName : null,
+        macOS: isConnected ? vnc.isMacOS : null,
+        reconnectCount: vnc?.reconnectCount ?? 0,
+        lastScreenshotMs: capture?.lastScreenshotMs ?? null,
+      },
+      ssh: {
+        status: ssh?.connected ? 'connected' : ssh ? 'disconnected' : 'not configured',
+        host: ssh ? `${ssh.host}:${ssh.port}` : null,
+        commandCount: ssh?.commandCount ?? 0,
+      },
       uptime: startTime ? Math.floor((Date.now() - startTime) / 1000) + 's' : null,
-      reconnectCount: vnc?.reconnectCount ?? 0,
-      lastScreenshotMs: capture?.lastScreenshotMs ?? null,
       memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
     };
+    // Hint: if macOS + SSH available, suggest AppleScript validation
+    if (isConnected && vnc.isMacOS && ssh) {
+      info.hint = 'macOS detected with SSH available. Use osascript via ssh tool for UI validation, clipboard access (pbpaste), and app control. Note: first-time osascript access to an app may trigger a macOS permission dialog — if an SSH command times out, use VNC screenshot to check for the dialog and click Allow.';
+    }
     return { text: JSON.stringify(info, null, 2) };
+  }
+
+  // ── SSH (independent of VNC) ──
+  if (name === 'ssh') {
+    if (!ssh) return { text: 'SSH not configured. Set SSH_HOST, SSH_USER, and SSH_PASSWORD or SSH_KEY environment variables.' };
+    const result = await ssh.exec(input.command, input.timeout);
+    const parts = [];
+    if (result.stdout) parts.push(result.stdout);
+    if (result.stderr) parts.push(`[stderr] ${result.stderr}`);
+    if (result.code !== 0) parts.push(`[exit code: ${result.code}]`);
+    return { text: parts.join('\n') || '(no output)' };
   }
 
   // ── VNC Readiness Gate ──
@@ -318,13 +342,29 @@ async function main() {
     password: process.env.VNC_PASSWORD || '',
   };
 
-  // 2. Create MCP server and register tools FIRST (before VNC connects)
+  // 2. SSH config (optional — tool only registered if configured)
+  const sshEnabled = !!(process.env.SSH_HOST && process.env.SSH_USER);
+  if (sshEnabled) {
+    /** @type {import('./lib/types.js').SSHConnectionConfig} */
+    const sshConfig = {
+      host: process.env.SSH_HOST,
+      port: parseInt(process.env.SSH_PORT || '22', 10),
+      username: process.env.SSH_USER,
+      password: process.env.SSH_PASSWORD || undefined,
+      privateKeyPath: process.env.SSH_KEY || undefined,
+    };
+    ssh = new SSHClient(sshConfig);
+    // Lazy connect — will connect on first exec()
+    console.error(`SSH configured: ${sshConfig.host}:${sshConfig.port} (user=${sshConfig.username})`);
+  }
+
+  // 3. Create MCP server and register tools (before VNC connects)
   //    Use a generous default display size — will be updated once VNC connects
   const defaultDisplay = { width: config.display?.max_dimension || 1280, height: 800 };
-  const tools = getToolDefinitions(defaultDisplay);
+  const tools = getToolDefinitions(defaultDisplay, { sshEnabled });
 
   const mcpServer = new McpServer(
-    { name: 'claude-kvm', version: '1.0.2' },
+    { name: 'claude-kvm', version: '1.0.3' },
     { capabilities: { tools: {} } },
   );
 
@@ -341,17 +381,17 @@ async function main() {
     }
   }
 
-  // 3. Start MCP transport IMMEDIATELY (no VNC dependency)
+  // 4. Start MCP transport IMMEDIATELY (no VNC dependency)
   const transport = new StdioServerTransport();
   await mcpServer.connect(transport);
   console.error('Claude KVM MCP server running on stdio');
 
-  // 4. Connect to VNC in background (non-blocking)
+  // 5. Connect to VNC in background (non-blocking)
   connectVNC(vncConfig);
 
   // Graceful shutdown
-  process.on('SIGINT', () => { vnc?.disconnect(); process.exit(0); });
-  process.on('SIGTERM', () => { vnc?.disconnect(); process.exit(0); });
+  process.on('SIGINT', () => { ssh?.disconnect(); vnc?.disconnect(); process.exit(0); });
+  process.on('SIGTERM', () => { ssh?.disconnect(); vnc?.disconnect(); process.exit(0); });
 }
 
 main().catch(err => { console.error('Fatal:', err); process.exit(1); });

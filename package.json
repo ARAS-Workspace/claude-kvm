@@ -1,7 +1,7 @@
 {
   "name": "claude-kvm",
-  "version": "1.0.2",
-  "description": "MCP server — control remote desktops via VNC",
+  "version": "1.0.3",
+  "description": "MCP server — control remote desktops via VNC and SSH",
   "license": "MIT",
   "author": "Rıza Emre ARAS <r.emrearas@proton.me>",
   "repository": {
@@ -14,7 +14,8 @@
     "kvm",
     "claude",
     "remote-desktop",
-    "automation"
+    "automation",
+    "ssh"
   ],
   "main": "index.js",
   "bin": {
@@ -36,6 +37,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "sharp": "^0.33.5",
+    "ssh2": "^1.17.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
