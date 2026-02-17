@@ -42,26 +42,26 @@ Zorunlu olan sadece VNC bağlantı parametreleridir. Diğer parametreler opsiyon
 | `VNC_USERNAME`                   |             | Kullanıcı adı                                        |
 | `VNC_PASSWORD`                   |             | Şifre                                                |
 | `DISPLAY_MAX_DIMENSION`          | `1280`      | Ekran görüntüsünün ölçekleneceği maksimum boyut (px) |
-| `HID_CLICK_HOLD_MS`             | `80`        | Fare tıklama süresi (ms)                             |
-| `HID_KEY_HOLD_MS`               | `50`        | Tuş basma süresi (ms)                                |
-| `HID_TYPING_DELAY_MIN_MS`       | `30`        | Yazma gecikmesi alt sınır (ms)                       |
-| `HID_TYPING_DELAY_MAX_MS`       | `100`       | Yazma gecikmesi üst sınır (ms)                       |
+| `HID_CLICK_HOLD_MS`              | `80`        | Fare tıklama süresi (ms)                             |
+| `HID_KEY_HOLD_MS`                | `50`        | Tuş basma süresi (ms)                                |
+| `HID_TYPING_DELAY_MIN_MS`        | `30`        | Yazma gecikmesi alt sınır (ms)                       |
+| `HID_TYPING_DELAY_MAX_MS`        | `100`       | Yazma gecikmesi üst sınır (ms)                       |
 | `CAPTURE_STABLE_FRAME_THRESHOLD` | `0.5`       | Diff değişim algılama eşik değeri (%)                |
-| `DIFF_PIXEL_THRESHOLD`          | `30`        | Piksel farkı eşik değeri (0-255)                     |
+| `DIFF_PIXEL_THRESHOLD`           | `30`        | Piksel farkı eşik değeri (0-255)                     |
 
 ## Araçlar
 
-| Araç            | Dönen Değer       | Açıklama                                             |
-|-----------------|--------------------|------------------------------------------------------|
-| `mouse`         | `(x, y)`           | Fare işlemleri: move, click, click_at, scroll, drag  |
-| `keyboard`      | `OK`               | Klavye işlemleri: press, combo, type, paste           |
+| Araç            | Dönen Değer        | Açıklama                                            |
+|-----------------|--------------------|-----------------------------------------------------|
+| `mouse`         | `(x, y)`           | Fare işlemleri: move, click, click_at, scroll, drag |
+| `keyboard`      | `OK`               | Klavye işlemleri: press, combo, type, paste         |
 | `screenshot`    | `OK` + görüntü     | Tam ekran görüntüsü                                 |
-| `cursor_crop`   | `(x, y)` + görüntü | Cursor etrafındaki küçük kesit                       |
-| `diff_check`    | text               | Baseline'a karşı lightweight değişim algılama        |
-| `set_baseline`  | `OK`               | Mevcut ekranı diff referansı olarak kaydet           |
-| `wait`          | `OK`               | Belirtilen süre kadar bekle                          |
-| `task_complete` | özet               | Görevi tamamlandı olarak işaretle                    |
-| `task_failed`   | neden              | Görevi başarısız olarak işaretle                     |
+| `cursor_crop`   | `(x, y)` + görüntü | Cursor etrafındaki küçük kesit                      |
+| `diff_check`    | text               | Baseline'a karşı lightweight değişim algılama       |
+| `set_baseline`  | `OK`               | Mevcut ekranı diff referansı olarak kaydet          |
+| `wait`          | `OK`               | Belirtilen süre kadar bekle                         |
+| `task_complete` | özet               | Görevi tamamlandı olarak işaretle                   |
+| `task_failed`   | neden              | Görevi başarısız olarak işaretle                    |
 
 ---
 

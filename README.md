@@ -42,12 +42,12 @@ Only the VNC connection parameters are required. All other parameters are option
 | `VNC_USERNAME`                   |             | Username                                       |
 | `VNC_PASSWORD`                   |             | Password                                       |
 | `DISPLAY_MAX_DIMENSION`          | `1280`      | Maximum dimension to scale screenshots to (px) |
-| `HID_CLICK_HOLD_MS`             | `80`        | Mouse click hold duration (ms)                 |
-| `HID_KEY_HOLD_MS`               | `50`        | Key press hold duration (ms)                   |
-| `HID_TYPING_DELAY_MIN_MS`       | `30`        | Typing delay lower bound (ms)                  |
-| `HID_TYPING_DELAY_MAX_MS`       | `100`       | Typing delay upper bound (ms)                  |
+| `HID_CLICK_HOLD_MS`              | `80`        | Mouse click hold duration (ms)                 |
+| `HID_KEY_HOLD_MS`                | `50`        | Key press hold duration (ms)                   |
+| `HID_TYPING_DELAY_MIN_MS`        | `30`        | Typing delay lower bound (ms)                  |
+| `HID_TYPING_DELAY_MAX_MS`        | `100`       | Typing delay upper bound (ms)                  |
 | `CAPTURE_STABLE_FRAME_THRESHOLD` | `0.5`       | Diff change detection threshold (%)            |
-| `DIFF_PIXEL_THRESHOLD`          | `30`        | Per-channel pixel difference threshold (0-255) |
+| `DIFF_PIXEL_THRESHOLD`           | `30`        | Per-channel pixel difference threshold (0-255) |
 
 ## Tools
 
