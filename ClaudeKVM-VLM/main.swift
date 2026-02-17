@@ -77,8 +77,15 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
         let cachePath = engine.modelCachePath ?? "unknown"
         engine.log("Cache directory: \(cachePath)")
 
+        let toolPath = ProcessInfo.processInfo.arguments.first ?? "claude-kvm-vlm"
+        let resolvedPath = URL(fileURLWithPath: toolPath).standardizedFileURL.path
+
         print("[READY] \(VLMEngine.modelId)")
         print("[CACHE] \(cachePath)")
+        print("[PATH]  \(resolvedPath)")
+        print("")
+        print("Add to your .mcp.json:")
+        print("  \"CLAUDE_KVM_VLM_TOOL_PATH\": \"\(resolvedPath)\"")
     }
 
     private func runInference(_ engine: VLMEngine, prompt: String) async throws {
