@@ -69,19 +69,19 @@ SSH aracı yalnızca `SSH_HOST` ve `SSH_USER` ayarlandığında kaydedilir. Kiml
 
 ## Araçlar
 
-| Araç            | Dönen Değer         | Açıklama                                                    |
-|-----------------|---------------------|-------------------------------------------------------------|
-| `mouse`         | `(x, y)`            | Fare işlemleri: move, hover, click, click_at, scroll, drag  |
-| `keyboard`      | `OK`                | Klavye işlemleri: press, combo, type, paste                 |
-| `screenshot`    | `OK` + görüntü      | Tam ekran görüntüsü                                        |
-| `cursor_crop`   | `(x, y)` + görüntü  | Cursor etrafındaki küçük kesit                              |
-| `diff_check`    | `changeDetected`    | Baseline'a karşı piksel değişim algılama                    |
-| `set_baseline`  | `OK`                | Mevcut ekranı diff referansı olarak kaydet                  |
-| `health_check`  | JSON                | VNC/SSH durumu, çözünürlük, uptime, bellek                  |
-| `ssh`           | stdout/stderr       | Uzak makinede SSH üzerinden komut çalıştır                  |
-| `wait`          | `OK`                | Belirtilen süre kadar bekle                                 |
-| `task_complete` | özet                | Görevi tamamlandı olarak işaretle                           |
-| `task_failed`   | neden               | Görevi başarısız olarak işaretle                            |
+| Araç            | Dönen Değer        | Açıklama                                                   |
+|-----------------|--------------------|------------------------------------------------------------|
+| `mouse`         | `(x, y)`           | Fare işlemleri: move, hover, click, click_at, scroll, drag |
+| `keyboard`      | `OK`               | Klavye işlemleri: press, combo, type, paste                |
+| `screenshot`    | `OK` + görüntü     | Tam ekran görüntüsü                                        |
+| `cursor_crop`   | `(x, y)` + görüntü | Cursor etrafındaki küçük kesit                             |
+| `diff_check`    | `changeDetected`   | Baseline'a karşı piksel değişim algılama                   |
+| `set_baseline`  | `OK`               | Mevcut ekranı diff referansı olarak kaydet                 |
+| `health_check`  | JSON               | VNC/SSH durumu, çözünürlük, uptime, bellek                 |
+| `ssh`           | stdout/stderr      | Uzak makinede SSH üzerinden komut çalıştır                 |
+| `wait`          | `OK`               | Belirtilen süre kadar bekle                                |
+| `task_complete` | özet               | Görevi tamamlandı olarak işaretle                          |
+| `task_failed`   | neden              | Görevi başarısız olarak işaretle                           |
 
 ## Kimlik Doğrulama
 

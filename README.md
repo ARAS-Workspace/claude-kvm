@@ -69,19 +69,19 @@ The SSH tool is only registered when both `SSH_HOST` and `SSH_USER` are set. Aut
 
 ## Tools
 
-| Tool            | Returns           | Description                                              |
-|-----------------|-------------------|----------------------------------------------------------|
-| `mouse`         | `(x, y)`          | Mouse actions: move, hover, click, click_at, scroll, drag |
-| `keyboard`      | `OK`              | Keyboard actions: press, combo, type, paste              |
-| `screenshot`    | `OK` + image      | Capture full screen                                      |
-| `cursor_crop`   | `(x, y)` + image  | Small crop around cursor position                        |
-| `diff_check`    | `changeDetected`  | Lightweight pixel change detection against baseline      |
-| `set_baseline`  | `OK`              | Save current screen as diff reference                    |
-| `health_check`  | JSON              | VNC/SSH status, resolution, uptime, memory               |
-| `ssh`           | stdout/stderr     | Execute a command on the remote machine via SSH          |
-| `wait`          | `OK`              | Wait for a specified duration                            |
-| `task_complete` | summary           | Mark task as completed                                   |
-| `task_failed`   | reason            | Mark task as failed                                      |
+| Tool            | Returns          | Description                                               |
+|-----------------|------------------|-----------------------------------------------------------|
+| `mouse`         | `(x, y)`         | Mouse actions: move, hover, click, click_at, scroll, drag |
+| `keyboard`      | `OK`             | Keyboard actions: press, combo, type, paste               |
+| `screenshot`    | `OK` + image     | Capture full screen                                       |
+| `cursor_crop`   | `(x, y)` + image | Small crop around cursor position                         |
+| `diff_check`    | `changeDetected` | Lightweight pixel change detection against baseline       |
+| `set_baseline`  | `OK`             | Save current screen as diff reference                     |
+| `health_check`  | JSON             | VNC/SSH status, resolution, uptime, memory                |
+| `ssh`           | stdout/stderr    | Execute a command on the remote machine via SSH           |
+| `wait`          | `OK`             | Wait for a specified duration                             |
+| `task_complete` | summary          | Mark task as completed                                    |
+| `task_failed`   | reason           | Mark task as failed                                       |
 
 ## Authentication
 
