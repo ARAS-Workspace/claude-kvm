@@ -37,10 +37,13 @@ graph TB
         end
     end
 
+    subgraph Local["Yerel Makine (Apple Silicon)"]
+        MLX["MLX Framework<br/><i>FastVLM 0.5B</i>"]
+    end
+
     subgraph Target["Hedef Makine"]
         VNC_Server["VNC Server<br/><i>:5900</i>"]
         SSH_Server["SSH Server<br/><i>:22</i>"]
-        MLX["MLX Framework<br/><i>FastVLM 0.5B</i>"]
 
         Desktop["🖥️ Masaüstü Ortamı"]
         Shell["💻 Kabuk (Shell)"]
@@ -57,9 +60,10 @@ graph TB
     VNC_Client <-->|"RFB Protocol<br/>TCP :5900"| VNC_Server
     HID --> VNC_Client
     Capture --> VNC_Client
+    Capture -->|"PNG crop"| VLM_Bin
 
     SSH_Client <-->|"SSH Protocol<br/>TCP :22"| SSH_Server
-    VLM_Bin -->|"stdin: PNG crop<br/>stdout: text"| MLX
+    VLM_Bin -->|"stdin: PNG<br/>stdout: text"| MLX
 
     VNC_Server --> Desktop
     SSH_Server --> Shell
@@ -67,10 +71,12 @@ graph TB
     classDef server fill:#1a1a2e,stroke:#16213e,color:#e5e5e5
     classDef channel fill:#0f3460,stroke:#533483,color:#e5e5e5
     classDef target fill:#1a1a2e,stroke:#e94560,color:#e5e5e5
+    classDef local fill:#1a1a2e,stroke:#533483,color:#e5e5e5
 
     class Router server
     class VNC_Client,HID,Capture,SSH_Client,VLM_Bin channel
-    class VNC_Server,SSH_Server,MLX,Desktop,Shell target
+    class VNC_Server,SSH_Server,Desktop,Shell target
+    class MLX local
 ```
 
 ### Kanal Genel Bakış
