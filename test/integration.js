@@ -41,12 +41,13 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import Anthropic from '@anthropic-ai/sdk';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PROMPT_FILE = resolve(__dirname, 'test_prompt.md');
 
 function loadTask() {
   if (process.env.TASK) return process.env.TASK;
-  if (process.argv[2]) return process.argv[2];
-  return readFileSync(PROMPT_FILE, 'utf-8').trim();
+
+  const isMac = process.argv.includes('--mac');
+  const promptFile = resolve(__dirname, isMac ? 'test_prompt_mac.md' : 'test_prompt.md');
+  return readFileSync(promptFile, 'utf-8').trim();
 }
 
 const MODEL = process.env.MODEL || 'claude-sonnet-4-5-20250929';
