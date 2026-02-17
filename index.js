@@ -387,7 +387,7 @@ async function main() {
   console.error('Claude KVM MCP server running on stdio');
 
   // 5. Connect to VNC in background (non-blocking)
-  connectVNC(vncConfig);
+  void connectVNC(vncConfig);
 
   // Graceful shutdown
   process.on('SIGINT', () => { ssh?.disconnect(); vnc?.disconnect(); process.exit(0); });
