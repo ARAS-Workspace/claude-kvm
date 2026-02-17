@@ -135,6 +135,11 @@ export function charToKeysym(ch) {
   // Unicode beyond Latin-1 (Turkish ığşİĞŞ, etc.)
   // X11 keysym for Unicode: 0x01000000 + code point
   if (code > 0xFF) {
+    const lower = ch.toLowerCase();
+    if (lower !== ch) {
+      // Uppercase Unicode — send lowercase keysym + shift (e.g. Ş → shift + ş)
+      return { keysym: 0x01000000 + lower.charCodeAt(0), shift: true };
+    }
     return { keysym: 0x01000000 + code, shift: false };
   }
 

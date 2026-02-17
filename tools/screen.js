@@ -22,15 +22,23 @@ export function screenTools() {
   return [
     {
       name: 'screenshot',
-      description: 'Capture the full screen. Use to observe current state before acting.',
+      description: [
+        'Capture the full screen. Use to observe current state before acting.',
+        'IMPORTANT: Do NOT take a screenshot after every action. Only use when you need to:',
+        '- See the initial state of the screen',
+        '- Verify a complex visual result (page loaded, UI changed significantly)',
+        '- Read text or identify UI elements for the next action',
+        'For simple verifications, prefer diff_check (text-only, ~5ms) or cursor_crop (small image).',
+      ].join('\n'),
       inputSchema: null,
     },
     {
       name: 'cursor_crop',
       description: [
         'Capture a small crop around the current cursor position.',
-        'Lightweight alternative to a full screenshot for verifying cursor placement.',
-        'Returns cursor coordinates and a cropped image.',
+        'Returns cursor coordinates and a cropped image with a red crosshair marking the cursor.',
+        'Use to verify cursor placement on small targets (buttons, links, icons).',
+        'Much cheaper than a full screenshot — prefer this for position verification.',
       ].join('\n'),
       inputSchema: null,
     },
@@ -41,6 +49,7 @@ export function screenTools() {
         'Returns change percentage as text — no image. Fast (~5-10ms).',
         'Use after actions to verify if something changed without the cost of a full screenshot.',
         'Updates the baseline after comparison.',
+        'Typical workflow: set_baseline → action → diff_check → if changed, screenshot only if needed.',
       ].join('\n'),
       inputSchema: null,
     },

@@ -143,6 +143,7 @@ async function executeTool(name, input, hid, capture) {
   if (name === 'cursor_crop') {
     const pos = hid.getCursorPosition();
     const base64 = await capture.cursorCrop(pos.x, pos.y, 150);
+    saveScreenshot(base64, name);
     const sp = toScaled(pos);
     return { text: `(${sp.x}, ${sp.y})`, imageBase64: base64 };
   }
@@ -229,7 +230,7 @@ async function main() {
   const vnc = new VNCClient(vncConfig);
   console.error(`Connecting to VNC: ${vncConfig.host}:${vncConfig.port} (auth: ${vncConfig.auth})`);
   const serverInfo = await vnc.connect();
-  console.error(`VNC connected: ${serverInfo.name} (${serverInfo.width}x${serverInfo.height})`);
+  console.error(`VNC connected: ${serverInfo.name} (${serverInfo.width}x${serverInfo.height}) macOS=${vnc.isMacOS}`);
 
   // 2. Compute scaled display
   native = { width: serverInfo.width, height: serverInfo.height };

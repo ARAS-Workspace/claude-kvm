@@ -39,6 +39,12 @@ export function mouseTools(display) {
         '- double_click: Double-click at current position.',
         '- drag: Hold and drag from current position to (x,y).',
         '- scroll: Scroll at current position.',
+        '',
+        'Tips:',
+        '- Prefer click_at over move+click — it is faster (one call instead of two).',
+        '- For page scrolling, prefer keyboard pagedown/pageup — much faster and more predictable than scroll.',
+        '- Use scroll only for fine adjustments within a scrollable area.',
+        '- No screenshot is needed after every mouse action. Use diff_check to verify changes.',
       ].join('\n'),
       inputSchema: {
         action: z.enum(['move', 'nudge', 'click', 'click_at', 'right_click', 'double_click', 'drag', 'scroll']),

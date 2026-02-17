@@ -23,7 +23,7 @@ export function controlTools() {
   return [
     {
       name: 'wait',
-      description: 'Wait before the next action. Use when waiting for a page load, animation, or response.',
+      description: 'Wait before the next action. Use when waiting for a page load, animation, or response.\nDo NOT use wait between simple actions (click, type) — only when the remote system needs time to process (page navigation, app launch).',
       inputSchema: {
         ms: z.number().int().min(100).max(5000).describe('Duration in milliseconds (100–5000)'),
       },
