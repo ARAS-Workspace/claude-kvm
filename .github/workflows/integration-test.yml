@@ -1,0 +1,108 @@
+# SPDX-License-Identifier: MIT
+# Claude KVM — Integration Test
+#
+# Runs a real Claude session against a macOS VNC server.
+# The macOS runner enables Screen Sharing, the MCP server connects to localhost,
+# and Claude performs a task via the KVM tools.
+#
+# Artifacts: screenshots, asciinema recording, compiled video.
+
+name: Integration Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task for Claude to perform on the VM'
+        required: false
+        type: string
+      model:
+        description: 'Claude model to use'
+        required: false
+        default: 'claude-sonnet-4-5-20250929'
+        type: choice
+        options:
+          - claude-sonnet-4-5-20250929
+          - claude-opus-4-6
+          - claude-haiku-4-5-20251001
+      max_turns:
+        description: 'Maximum agentic turns'
+        required: false
+        default: '30'
+        type: string
+
+env:
+  TZ: Europe/Istanbul
+
+jobs:
+  integration-test:
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set timezone
+        run: sudo systemsetup -settimezone "Europe/Istanbul"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install recording tools
+        run: brew install asciinema ffmpeg
+
+      - name: Enable Screen Sharing (VNC)
+        run: |
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure -access -on \
+            -clientopts -setvnclegacy -vnclegacy yes \
+            -clientopts -setvncpw -vncpw testpass \
+            -restart -agent -privs -all
+          sleep 3
+
+          echo "--- Verifying VNC ---"
+          lsof -i :5900 || echo "⚠ VNC port 5900 not listening"
+
+      - name: Run integration test
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VNC_HOST: 127.0.0.1
+          VNC_PORT: 5900
+          VNC_PASSWORD: testpass
+          SCREENSHOTS_DIR: ./test-screenshots
+          MODEL: ${{ inputs.model || 'claude-sonnet-4-5-20250929' }}
+          MAX_TURNS: ${{ inputs.max_turns || '30' }}
+          TASK: ${{ inputs.task || '' }}
+        run: |
+          mkdir -p test-screenshots
+          asciinema rec -c "node test/integration.js" test-session.cast
+
+      - name: Compile screenshots to video
+        if: always()
+        run: |
+          if ls test-screenshots/*.png 1>/dev/null 2>&1; then
+            # Sort screenshots by name (they're zero-padded: 001-screenshot.png)
+            ffmpeg -framerate 2 -pattern_type glob -i 'test-screenshots/*.png' \
+              -c:v libx264 -pix_fmt yuv420p \
+              -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" \
+              screen-recording.mp4 || echo "⚠ Video compilation failed"
+          else
+            echo "No screenshots to compile"
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-${{ github.run_id }}
+          path: |
+            screen-recording.mp4
+            test-session.cast
+            test-screenshots/
+          retention-days: 30
