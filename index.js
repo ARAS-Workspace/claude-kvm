@@ -15,6 +15,7 @@
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { VNCClient } from './lib/vnc.js';
@@ -55,6 +56,10 @@ const config = {
 // ── Screenshot Saving (CI) ──────────────────────────────────
 
 const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || null;
+const VLM_TOOL_PATH = env('CLAUDE_KVM_VLM_TOOL_PATH', null);
+const vlmEnabled = !!VLM_TOOL_PATH;
+
+if (vlmEnabled) console.error(`VLM tool configured: ${VLM_TOOL_PATH}`);
 let screenshotIndex = 0;
 
 if (SCREENSHOTS_DIR) mkdirSync(SCREENSHOTS_DIR, { recursive: true });
@@ -218,6 +223,45 @@ async function executeTool(name, input) {
     return { text: 'OK' };
   }
 
+  // ── VLM Query (macOS on-device vision model) ──
+  if (name === 'vlm_query') {
+    if (!VLM_TOOL_PATH) return { text: 'VLM tool not configured. Set CLAUDE_KVM_VLM_TOOL_PATH environment variable.' };
+
+    const topLeft = toNative(input.x, input.y);
+    const sx = native.width / scaled.width;
+    const sy = native.height / scaled.height;
+    const nativeW = Math.round(input.width * sx);
+    const nativeH = Math.round(input.height * sy);
+
+    const pngBuffer = await capture.cropRegion(topLeft.x, topLeft.y, nativeW, nativeH);
+
+    const args = ['--prompt', input.prompt];
+    if (input.max_tokens) args.push('--max-tokens', String(input.max_tokens));
+    if (input.verbose) args.push('--verbose');
+
+    const vlmResult = await new Promise((resolve, reject) => {
+      const child = execFile(VLM_TOOL_PATH, args, {
+        encoding: 'buffer',
+        timeout: 120_000,
+        maxBuffer: 1024 * 1024,
+      }, (err, stdout, stderr) => {
+        const stderrStr = stderr?.toString().trim() || '';
+        if (err) {
+          const errorMatch = stderrStr.match(/\[ERROR]\s*(.*)/);
+          reject(new Error(errorMatch ? errorMatch[1] : (err.message || 'VLM inference failed')));
+          return;
+        }
+        if (stderrStr) console.error(`[vlm] ${stderrStr}`);
+        resolve(stdout.toString().trim());
+      });
+
+      child.stdin.write(pngBuffer);
+      child.stdin.end();
+    });
+
+    return { text: vlmResult };
+  }
+
   // ── Flow Control ──
   if (name === 'wait') {
     await sleep(input.ms);
@@ -361,10 +405,10 @@ async function main() {
   // 3. Create MCP server and register tools (before VNC connects)
   //    Use a generous default display size — will be updated once VNC connects
   const defaultDisplay = { width: config.display?.max_dimension || 1280, height: 800 };
-  const tools = getToolDefinitions(defaultDisplay, { sshEnabled });
+  const tools = getToolDefinitions(defaultDisplay, { sshEnabled, vlmEnabled });
 
   const mcpServer = new McpServer(
-    { name: 'claude-kvm', version: '1.0.3' },
+    { name: 'claude-kvm', version: '1.0.4' },
     { capabilities: { tools: {} } },
   );
 

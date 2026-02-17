@@ -20,7 +20,8 @@ Create a `.mcp.json` file in your project root directory:
         "VNC_PASSWORD": "pass",
         "SSH_HOST": "192.168.1.100",
         "SSH_USER": "user",
-        "SSH_PASSWORD": "pass"
+        "SSH_PASSWORD": "pass",
+        "CLAUDE_KVM_VLM_TOOL_PATH": "/path/to/claude-kvm-vlm"
       }
     }
   }
@@ -55,6 +56,14 @@ Only the VNC connection parameters are required. SSH and all other parameters ar
 
 The SSH tool is only registered when both `SSH_HOST` and `SSH_USER` are set. Authentication uses either password or key — whichever is provided.
 
+#### VLM (optional, macOS only)
+
+| Parameter                  | Default | Description                                          |
+|----------------------------|---------|------------------------------------------------------|
+| `CLAUDE_KVM_VLM_TOOL_PATH` |         | Absolute path to `claude-kvm-vlm` binary (macOS arm64). Enables the `vlm_query` tool when set. |
+
+The `vlm_query` tool is only registered when `CLAUDE_KVM_VLM_TOOL_PATH` is set. Requires Apple Silicon.
+
 #### Display & Input
 
 | Parameter                    | Default     | Description                                    |
@@ -79,6 +88,7 @@ The SSH tool is only registered when both `SSH_HOST` and `SSH_USER` are set. Aut
 | `set_baseline`  | `OK`             | Save current screen as diff reference                     |
 | `health_check`  | JSON             | VNC/SSH status, resolution, uptime, memory                |
 | `ssh`           | stdout/stderr    | Execute a command on the remote machine via SSH           |
+| `vlm_query`     | text             | On-device VLM query on a cropped screen region (macOS)    |
 | `wait`          | `OK`             | Wait for a specified duration                             |
 | `task_complete` | summary          | Mark task as completed                                    |
 | `task_failed`   | reason           | Mark task as failed                                       |

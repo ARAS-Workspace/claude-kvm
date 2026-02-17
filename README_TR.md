@@ -20,7 +20,8 @@ Proje kök dizinine `.mcp.json` dosyası oluşturun:
         "VNC_PASSWORD": "pass",
         "SSH_HOST": "192.168.1.100",
         "SSH_USER": "user",
-        "SSH_PASSWORD": "pass"
+        "SSH_PASSWORD": "pass",
+        "CLAUDE_KVM_VLM_TOOL_PATH": "/path/to/claude-kvm-vlm"
       }
     }
   }
@@ -55,6 +56,14 @@ Zorunlu olan sadece VNC bağlantı parametreleridir. SSH ve diğer parametreler 
 
 SSH aracı yalnızca `SSH_HOST` ve `SSH_USER` ayarlandığında kaydedilir. Kimlik doğrulama şifre veya anahtar ile yapılır — hangisi sağlanırsa o kullanılır.
 
+#### VLM (opsiyonel, yalnızca macOS)
+
+| Parametre                   | Varsayılan | Açıklama                                                   |
+|-----------------------------|------------|------------------------------------------------------------|
+| `CLAUDE_KVM_VLM_TOOL_PATH`  |            | `claude-kvm-vlm` binary'sinin tam yolu (macOS arm64). Ayarlandığında `vlm_query` aracını etkinleştirir. |
+
+`vlm_query` aracı yalnızca `CLAUDE_KVM_VLM_TOOL_PATH` ayarlandığında kaydedilir. Apple Silicon gerektirir.
+
 #### Ekran ve Girdi
 
 | Parametre                    | Varsayılan  | Açıklama                                             |
@@ -79,6 +88,7 @@ SSH aracı yalnızca `SSH_HOST` ve `SSH_USER` ayarlandığında kaydedilir. Kiml
 | `set_baseline`  | `OK`               | Mevcut ekranı diff referansı olarak kaydet                 |
 | `health_check`  | JSON               | VNC/SSH durumu, çözünürlük, uptime, bellek                 |
 | `ssh`           | stdout/stderr      | Uzak makinede SSH üzerinden komut çalıştır                 |
+| `vlm_query`     | metin              | Ekranın kırpılmış bölgesinde on-device VLM sorgusu (macOS) |
 | `wait`          | `OK`               | Belirtilen süre kadar bekle                                |
 | `task_complete` | özet               | Görevi tamamlandı olarak işaretle                          |
 | `task_failed`   | neden              | Görevi başarısız olarak işaretle                           |
