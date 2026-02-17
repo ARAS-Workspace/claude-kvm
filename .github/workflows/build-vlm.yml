@@ -110,7 +110,8 @@ jobs:
       # ── 6. Codesign ─────────────────────────────────────────
       - name: Codesign binary
         run: |
-          codesign --sign "Developer ID Application" \
+          codesign --force \
+            --sign "Developer ID Application" \
             --options runtime \
             --timestamp \
             --keychain "$KEYCHAIN_PATH" \
