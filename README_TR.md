@@ -58,11 +58,17 @@ SSH aracı yalnızca `SSH_HOST` ve `SSH_USER` ayarlandığında kaydedilir. Kiml
 
 #### VLM (opsiyonel, yalnızca macOS)
 
-| Parametre                  | Varsayılan | Açıklama                                                                                                |
-|----------------------------|------------|---------------------------------------------------------------------------------------------------------|
-| `CLAUDE_KVM_VLM_TOOL_PATH` |            | `claude-kvm-vlm` binary'sinin tam yolu (macOS arm64). Ayarlandığında `vlm_query` aracını etkinleştirir. |
+| Parametre                  | Varsayılan | Açıklama                                                                                   |
+|----------------------------|------------|--------------------------------------------------------------------------------------------|
+| `CLAUDE_KVM_VLM_TOOL_PATH` |            | `claude-kvm-vlm` tam yolu (macOS arm64). Ayarlandığında `vlm_query` aracını etkinleştirir. |
 
 `vlm_query` aracı yalnızca `CLAUDE_KVM_VLM_TOOL_PATH` ayarlandığında kaydedilir. Apple Silicon gerektirir.
+
+`claude-kvm-vlm` CI üzerinden derlenir, imzalanır ve notarize edilir:
+
+- [Aracı İndir](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22107692047/artifacts/5542705648)
+- [Build Workflow](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22107692047)
+- [Kaynak Kod](https://github.com/ARAS-Workspace/claude-kvm/tree/vlm-tool)
 
 #### Ekran ve Girdi
 

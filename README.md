@@ -64,6 +64,12 @@ The SSH tool is only registered when both `SSH_HOST` and `SSH_USER` are set. Aut
 
 The `vlm_query` tool is only registered when `CLAUDE_KVM_VLM_TOOL_PATH` is set. Requires Apple Silicon.
 
+The `claude-kvm-vlm` binary is built, code-signed and notarized via CI:
+
+- [Download Tool](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22107692047/artifacts/5542705648)
+- [Build Workflow](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22107692047)
+- [Source Code](https://github.com/ARAS-Workspace/claude-kvm/tree/vlm-tool)
+
 #### Display & Input
 
 | Parameter                    | Default     | Description                                    |
