@@ -32,7 +32,7 @@ env:
 
 jobs:
   integration-test:
-    runs-on: macos-26
+    runs-on: macos-13
     timeout-minutes: 20
 
     steps:
@@ -55,21 +55,43 @@ jobs:
 
       - name: Enable Screen Sharing (VNC)
         run: |
-          # Configure ARD with VNC legacy password
+          # Step 1: Configure ARD with VNC legacy password
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on \
             -clientopts -setvnclegacy -vnclegacy yes \
             -clientopts -setvncpw -vncpw testpass \
-            -privs -all
+            -restart -agent -privs -all -allowAccessFor -allUsers
 
-          # Restart agent separately (kickstart -restart can fail silently on macOS 15)
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-            -restart -agent
-
-          # Also enable Screen Sharing launch daemon as fallback
+          # Step 2: Enable Screen Sharing launch daemon
+          sudo launchctl enable system/com.apple.screensharing
+          sudo launchctl bootstrap system /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
           sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
 
-          # Wait for VNC to bind
+          # Step 3: Grant TCC permissions (requires SIP disabled — macos-13 has SIP off)
+          TCC_DB="/Library/Application Support/com.apple.TCC/TCC.db"
+          EPOCH=$(date +%s)
+
+          sudo sqlite3 "${TCC_DB}" "DELETE FROM access WHERE client = 'com.apple.screensharing.agent';"
+
+          sudo sqlite3 "${TCC_DB}" \
+            "INSERT INTO access (service, client, client_type, auth_value, auth_reason, auth_version, \
+            indirect_object_identifier_type, indirect_object_identifier, flags, last_modified) \
+            VALUES ('kTCCServicePostEvent', 'com.apple.screensharing.agent', 0, 2, 4, 1, 0, 'UNUSED', 0, ${EPOCH});"
+
+          sudo sqlite3 "${TCC_DB}" \
+            "INSERT INTO access (service, client, client_type, auth_value, auth_reason, auth_version, \
+            indirect_object_identifier_type, indirect_object_identifier, flags, last_modified) \
+            VALUES ('kTCCServiceScreenCapture', 'com.apple.screensharing.agent', 0, 2, 4, 1, 0, 'UNUSED', 0, ${EPOCH});"
+
+          echo "TCC permissions inserted"
+
+          # Step 4: Restart screen sharing daemon to pick up TCC changes
+          sudo pkill screensharingd 2>/dev/null || true
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -restart -agent
+          sleep 3
+
+          # Step 5: Wait for VNC to bind
           echo "--- Waiting for VNC on port 5900 ---"
           for i in 1 2 3 4 5 6 7 8 9 10; do
             if lsof -i :5900 >/dev/null 2>&1; then
@@ -83,8 +105,10 @@ jobs:
           # Diagnostics on failure
           if ! lsof -i :5900 >/dev/null 2>&1; then
             echo "--- VNC failed to start, diagnostics ---"
+            csrutil status || true
             ps aux | grep -i -E 'ARD|vnc|screensharing' | grep -v grep || true
             sudo launchctl list | grep -i -E 'screen|remote' || true
+            sudo sqlite3 "${TCC_DB}" "SELECT service, client, auth_value FROM access WHERE client LIKE '%screensharing%';" || true
             exit 1
           fi
 
