@@ -58,8 +58,8 @@ The SSH tool is only registered when both `SSH_HOST` and `SSH_USER` are set. Aut
 
 #### VLM (optional, macOS only)
 
-| Parameter                  | Default | Description                                          |
-|----------------------------|---------|------------------------------------------------------|
+| Parameter                  | Default | Description                                                                                    |
+|----------------------------|---------|------------------------------------------------------------------------------------------------|
 | `CLAUDE_KVM_VLM_TOOL_PATH` |         | Absolute path to `claude-kvm-vlm` binary (macOS arm64). Enables the `vlm_query` tool when set. |
 
 The `vlm_query` tool is only registered when `CLAUDE_KVM_VLM_TOOL_PATH` is set. Requires Apple Silicon.
