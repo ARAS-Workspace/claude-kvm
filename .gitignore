@@ -21,3 +21,11 @@ Package.resolved
 
 # Claude
 .claude/
+
+# LibVNC vendor build artifacts
+vendor/libvnc/src/
+vendor/libvnc/build/
+vendor/libvnc/dist/
+vendor/libvnc/*.tar.gz
+# prebuilt/ is tracked — CI commits here
+!vendor/libvnc/prebuilt/

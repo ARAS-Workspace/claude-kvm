@@ -1,0 +1,72 @@
+name: Build LibVNCClient Static Library
+
+on:
+  push:
+    tags: [ "libvnc-v*" ]
+  workflow_dispatch:
+
+env:
+  LIBVNC_VERSION: "0.9.15"
+  MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+jobs:
+  build:
+    name: Build libvncclient (aarch64-apple-darwin)
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: libvnc-build
+
+      - name: Install build dependencies
+        run: |
+          brew install cmake openssl@3 jpeg-turbo
+
+      - name: Build static library
+        run: |
+          cd vendor/libvnc
+          ./build.sh --clean --verify
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifact/include/rfb
+          cp vendor/libvnc/dist/lib/libvncclient.a artifact/
+          cp vendor/libvnc/dist/include/rfb/*.h artifact/include/rfb/
+          cp vendor/libvnc/CLibVNCClient/module.modulemap artifact/
+          cp vendor/libvnc/CLibVNCClient/include/CLibVNCClient.h artifact/include/
+          cd artifact && shasum -a 256 libvncclient.a > CHECKSUM.sha256
+          echo "=== Build Info ==="
+          file libvncclient.a
+          lipo -info libvncclient.a
+          ls -lh libvncclient.a
+          cat CHECKSUM.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libvncclient-${{ env.LIBVNC_VERSION }}-aarch64-apple-darwin
+          path: artifact/
+          retention-days: 90
+
+      - name: Commit prebuilt to branch
+        run: |
+          mkdir -p vendor/libvnc/prebuilt/include/rfb
+          cp artifact/libvncclient.a vendor/libvnc/prebuilt/
+          cp artifact/include/rfb/*.h vendor/libvnc/prebuilt/include/rfb/
+          cp artifact/include/CLibVNCClient.h vendor/libvnc/prebuilt/include/
+          cp artifact/module.modulemap vendor/libvnc/prebuilt/
+          cp artifact/CHECKSUM.sha256 vendor/libvnc/prebuilt/
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add vendor/libvnc/prebuilt/
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "build: libvncclient ${LIBVNC_VERSION} prebuilt (aarch64-apple-darwin)
+
+          SHA256: $(cat artifact/CHECKSUM.sha256)
+          Runner: macos-26
+          Source: LibVNCServer-${LIBVNC_VERSION}
+          TLS: OpenSSL 3.x
+          Compression: zlib + libjpeg-turbo"
+          git push origin HEAD:libvnc-build
