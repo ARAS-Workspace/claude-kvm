@@ -1,6 +1,117 @@
 # Claude KVM
 
-Claude KVM is an MCP tool that controls your remote desktop environment over VNC, with optional SSH for shell access.
+Claude KVM is an MCP tool that controls your remote desktop environment over VNC, with optional SSH access.
+
+## Architecture
+
+Claude KVM follows an **atomic instrument** design — each tool does one thing, Claude orchestrates the flow. The system provides three independent channels, each optimized for a different type of interaction:
+
+```mermaid
+graph TB
+    subgraph MCP["MCP Client (Claude)"]
+        AI["🤖 Claude"]
+    end
+
+    subgraph Server["claude-kvm · MCP Server (stdio)"]
+        direction TB
+        Router["Tool Router<br/><code>index.js</code>"]
+
+        subgraph Channels["Channels"]
+            direction LR
+            subgraph VNC_Ch["VNC Channel"]
+                direction TB
+                VNC_Client["VNC Client<br/><code>lib/vnc.js</code>"]
+                HID["HID Controller<br/><code>lib/hid.js</code>"]
+                Capture["Screen Capture<br/><code>lib/capture.js</code>"]
+            end
+
+            subgraph SSH_Ch["SSH Channel"]
+                direction TB
+                SSH_Client["SSH Client<br/><code>lib/ssh.js</code>"]
+            end
+
+            subgraph VLM_Ch["VLM Channel"]
+                direction TB
+                VLM_Bin["claude-kvm-vlm<br/><i>Apple Silicon binary</i>"]
+            end
+        end
+    end
+
+    subgraph Target["Target Machine"]
+        VNC_Server["VNC Server<br/><i>:5900</i>"]
+        SSH_Server["SSH Server<br/><i>:22</i>"]
+        MLX["MLX Framework<br/><i>FastVLM 0.5B</i>"]
+
+        Desktop["🖥️ Desktop Environment"]
+        Shell["💻 Shell"]
+    end
+
+    AI <--->|"stdio<br/>JSON-RPC"| Router
+
+    Router --> VNC_Client
+    Router --> HID
+    Router --> Capture
+    Router --> SSH_Client
+    Router --> VLM_Bin
+
+    VNC_Client <-->|"RFB Protocol<br/>TCP :5900"| VNC_Server
+    HID --> VNC_Client
+    Capture --> VNC_Client
+
+    SSH_Client <-->|"SSH Protocol<br/>TCP :22"| SSH_Server
+    VLM_Bin -->|"stdin: PNG crop<br/>stdout: text"| MLX
+
+    VNC_Server --> Desktop
+    SSH_Server --> Shell
+
+    classDef server fill:#1a1a2e,stroke:#16213e,color:#e5e5e5
+    classDef channel fill:#0f3460,stroke:#533483,color:#e5e5e5
+    classDef target fill:#1a1a2e,stroke:#e94560,color:#e5e5e5
+
+    class Router server
+    class VNC_Client,HID,Capture,SSH_Client,VLM_Bin channel
+    class VNC_Server,SSH_Server,MLX,Desktop,Shell target
+```
+
+### Channel Overview
+
+| Channel | Transport         | Purpose                                          | Tools                                                                     |
+|---------|-------------------|--------------------------------------------------|---------------------------------------------------------------------------|
+| **VNC** | RFB over TCP      | Visual control — screen capture, mouse, keyboard | `screenshot` `cursor_crop` `diff_check` `set_baseline` `mouse` `keyboard` |
+| **SSH** | SSH over TCP      | Text I/O — shell commands, file ops, osascript   | `ssh`                                                                     |
+| **VLM** | stdin/stdout pipe | Pixel → text — on-device OCR and visual Q&A      | `vlm_query`                                                               |
+
+### How They Work Together
+
+Each channel has a strength. Claude picks the most efficient one — or combines them:
+
+- **Read a web page** → VNC navigates, VLM reads text from a region, no screenshot needed
+- **Run a shell command** → SSH returns text directly, faster than typing in a terminal via VNC
+- **Verify a change** → `diff_check` detects change (5ms, no image), `cursor_crop` confirms placement (small image), `screenshot` only when needed (full image)
+- **Debug a dialog** → VLM reads the button labels, SSH runs `osascript` to get window info, VNC clicks the right button
+
+### Three-Layer Screen Strategy
+
+Claude minimizes token cost with a progressive verification approach:
+
+```
+diff_check  →  changeDetected: true/false     ~5ms   (text only, no image)
+cursor_crop →  300×300px around cursor         ~200ms (small image)
+screenshot  →  full screen capture             ~1200ms (full image, HiDPI)
+```
+
+Start cheap, escalate only when needed.
+
+### Coordinate Scaling
+
+The VNC server's native resolution is scaled down to fit within `DISPLAY_MAX_DIMENSION` (default: 1280px). Claude works in scaled coordinates — the server transparently converts between native and scaled space:
+
+```
+Native:  3840 × 2400  (VNC server framebuffer)
+Scaled:  1280 × 800   (what Claude sees and targets)
+
+click_at(640, 400) → VNC receives (1920, 1200)
+```
 
 ## Usage
 
@@ -64,10 +175,16 @@ The SSH tool is only registered when both `SSH_HOST` and `SSH_USER` are set. Aut
 
 The `vlm_query` tool is only registered when `CLAUDE_KVM_VLM_TOOL_PATH` is set. Requires Apple Silicon.
 
+##### Quick Install
+
+```bash
+brew tap ARAS-Workspace/tap
+brew install claude-kvm-vlm
+```
+
 The `claude-kvm-vlm` binary is built, code-signed and notarized via CI:
 
-- [Download Tool](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22110285050/artifacts/5543798099)
-- [Build Workflow](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22110285050)
+- [Build Workflow](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22114321867)
 - [Source Code](https://github.com/ARAS-Workspace/claude-kvm/tree/vlm-tool)
 
 #### Display & Input
