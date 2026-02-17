@@ -66,8 +66,8 @@ SSH aracı yalnızca `SSH_HOST` ve `SSH_USER` ayarlandığında kaydedilir. Kiml
 
 `claude-kvm-vlm` CI üzerinden derlenir, imzalanır ve notarize edilir:
 
-- [Aracı İndir](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22107692047/artifacts/5542705648)
-- [Build Workflow](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22107692047)
+- [Aracı İndir](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22110285050/artifacts/5543798099)
+- [Build Workflow](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22110285050)
 - [Kaynak Kod](https://github.com/ARAS-Workspace/claude-kvm/tree/vlm-tool)
 
 #### Ekran ve Girdi

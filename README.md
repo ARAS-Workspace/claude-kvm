@@ -66,8 +66,8 @@ The `vlm_query` tool is only registered when `CLAUDE_KVM_VLM_TOOL_PATH` is set. 
 
 The `claude-kvm-vlm` binary is built, code-signed and notarized via CI:
 
-- [Download Tool](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22107692047/artifacts/5542705648)
-- [Build Workflow](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22107692047)
+- [Download Tool](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22110285050/artifacts/5543798099)
+- [Build Workflow](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22110285050)
 - [Source Code](https://github.com/ARAS-Workspace/claude-kvm/tree/vlm-tool)
 
 #### Display & Input
