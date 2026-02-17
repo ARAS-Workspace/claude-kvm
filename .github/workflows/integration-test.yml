@@ -5,7 +5,7 @@
 # A Docker container provides LXDE desktop + VNC server on port 5900.
 # The MCP server connects to it and Claude performs a task via KVM tools.
 #
-# Artifacts: screenshots, asciinema recording, compiled video.
+# Artifacts: screenshots.
 
 name: Integration Test
 
@@ -35,12 +35,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    services:
+      desktop:
+        image: dorowu/ubuntu-desktop-lxde-vnc
+        env:
+          RESOLUTION: 1280x800
+          VNC_PASSWORD: testpass
+        ports:
+          - 5900:5900
+        options: --shm-size=512m
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set timezone
-        run: sudo timedatectl set-timezone Europe/Istanbul
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,74 +57,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install recording tools
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq asciinema ffmpeg
-
-      - name: Start Ubuntu desktop (Docker + VNC)
+      - name: Wait for VNC
         run: |
-          docker run -d --name desktop \
-            -p 5900:5900 \
-            -e VNC_PASSWORD=testpass \
-            -e RESOLUTION=1280x800 \
-            -v /dev/shm:/dev/shm \
-            dorowu/ubuntu-desktop-lxde-vnc
-
-          echo "--- Waiting for VNC on port 5900 ---"
           for i in $(seq 1 30); do
-            if nc -z localhost 5900 2>/dev/null; then
-              echo "VNC ready on port 5900"
-              break
-            fi
-            echo "  attempt $i/30..."
-            sleep 2
+            nc -z localhost 5900 && echo "VNC ready" && exit 0
+            sleep 1
           done
-
-          if ! nc -z localhost 5900 2>/dev/null; then
-            echo "--- VNC failed, checking container ---"
-            docker logs desktop --tail 50
-            docker exec desktop ss -tlnp || true
-            exit 1
-          fi
+          echo "VNC timeout" && exit 1
 
       - name: Run integration test
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          VNC_HOST: 127.0.0.1
+          VNC_HOST: localhost
           VNC_PORT: 5900
+          VNC_AUTH: auto
           VNC_PASSWORD: testpass
           SCREENSHOTS_DIR: ./test-screenshots
           MODEL: ${{ inputs.model || 'claude-sonnet-4-5-20250929' }}
           MAX_TURNS: ${{ inputs.max_turns || '30' }}
         run: |
           mkdir -p test-screenshots
-          asciinema rec -c "node test/integration.js" test-session.cast
+          node test/integration.js
 
-      - name: Compile screenshots to video
-        if: always()
-        run: |
-          if ls test-screenshots/*.png 1>/dev/null 2>&1; then
-            ffmpeg -framerate 2 -pattern_type glob -i 'test-screenshots/*.png' \
-              -c:v libx264 -pix_fmt yuv420p \
-              -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" \
-              screen-recording.mp4 || echo "Video compilation failed"
-          else
-            echo "No screenshots to compile"
-          fi
-
-      - name: Stop desktop container
-        if: always()
-        run: |
-          docker logs desktop --tail 20 > docker-desktop.log 2>&1 || true
-          docker stop desktop || true
-
-      - name: Upload artifacts
+      - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: integration-test-${{ github.run_id }}
-          path: |
-            screen-recording.mp4
-            test-session.cast
-            test-screenshots/
-            docker-desktop.log
-          retention-days: 30
+          name: screenshots
+          path: test-screenshots/
+          if-no-files-found: ignore
