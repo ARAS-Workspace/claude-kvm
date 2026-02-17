@@ -120,39 +120,49 @@ jobs:
           echo "--- Verify signature ---"
           codesign -dvv artifact/claude-kvm-vlm
 
-      # ── 7. Notarize ─────────────────────────────────────────
-      - name: Notarize binary
+      # ── 7. Create DMG ──────────────────────────────────────
+      - name: Create DMG
+        run: |
+          hdiutil create \
+            -volname "claude-kvm-vlm" \
+            -srcfolder artifact \
+            -ov -format UDZO \
+            claude-kvm-vlm-darwin-arm64.dmg
+
+          echo "--- DMG created ---"
+          ls -lh claude-kvm-vlm-darwin-arm64.dmg
+
+      # ── 8. Notarize & staple DMG ───────────────────────────
+      - name: Notarize & staple DMG
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
         run: |
-          ditto -c -k --keepParent artifact "$RUNNER_TEMP/vlm-notarize.zip"
-
-          xcrun notarytool submit "$RUNNER_TEMP/vlm-notarize.zip" \
+          xcrun notarytool submit claude-kvm-vlm-darwin-arm64.dmg \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_ID_PASSWORD" \
             --team-id "$TEAM_ID" \
             --wait
 
-      # ── 8. Archive & upload ─────────────────────────────────
-      - name: Create archive
-        run: |
-          cd artifact
-          tar -czf ../claude-kvm-vlm-darwin-arm64.tar.gz claude-kvm-vlm mlx.metallib
+          xcrun stapler staple claude-kvm-vlm-darwin-arm64.dmg
+
+          echo "--- Verify staple ---"
+          xcrun stapler validate claude-kvm-vlm-darwin-arm64.dmg
 
           echo "### Build Complete" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Binary:** claude-kvm-vlm (arm64)" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Signed:** Developer ID Application" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Notarized:** Yes" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Notarized:** Yes (stapled)" >> "$GITHUB_STEP_SUMMARY"
 
+      # ── 9. Upload ──────────────────────────────────────────
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: claude-kvm-vlm-darwin-arm64
-          path: claude-kvm-vlm-darwin-arm64.tar.gz
+          path: claude-kvm-vlm-darwin-arm64.dmg
           retention-days: 90
 
-      # ── 9. Cleanup ──────────────────────────────────────────
+      # ── 10. Cleanup ─────────────────────────────────────────
       - name: Cleanup signing artifacts
         if: always()
         run: |
