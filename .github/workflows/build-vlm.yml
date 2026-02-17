@@ -132,7 +132,19 @@ jobs:
           echo "--- Verify signature ---"
           codesign -dvv artifact/claude-kvm-vlm
 
-      # ── 7. Create DMG ──────────────────────────────────────
+      # ── 7. Create tar.gz (signed binary, for Homebrew) ─────
+      - name: Create tar.gz
+        run: |
+          VERSION="${{ inputs.version || '0.0.0' }}"
+          TAR_NAME="claude-kvm-vlm-${VERSION}-darwin-arm64.tar.gz"
+
+          tar -czf "$TAR_NAME" -C artifact .
+
+          echo "TAR_NAME=$TAR_NAME" >> "$GITHUB_ENV"
+          echo "--- tar.gz created ---"
+          ls -lh "$TAR_NAME"
+
+      # ── 8. Create DMG ──────────────────────────────────────
       - name: Create DMG
         run: |
           VERSION="${{ inputs.version || '0.0.0' }}"
@@ -148,7 +160,7 @@ jobs:
           echo "--- DMG created ---"
           ls -lh "$DMG_NAME"
 
-      # ── 8. Notarize & staple DMG ───────────────────────────
+      # ── 9. Notarize & staple DMG ───────────────────────────
       - name: Notarize & staple DMG
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -168,18 +180,26 @@ jobs:
           echo "### Build Complete" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Binary:** claude-kvm-vlm (arm64)" >> "$GITHUB_STEP_SUMMARY"
           echo "- **DMG:** $DMG_NAME" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **tar.gz:** $TAR_NAME" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Signed:** Developer ID Application" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Notarized:** Yes (stapled)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Notarized:** Yes (DMG stapled)" >> "$GITHUB_STEP_SUMMARY"
 
-      # ── 9. Upload ──────────────────────────────────────────
-      - name: Upload artifact
+      # ── 10. Upload artifacts ────────────────────────────────
+      - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.DMG_NAME }}
           path: ${{ env.DMG_NAME }}
           retention-days: 90
 
-      # ── 10. Cleanup ─────────────────────────────────────────
+      - name: Upload tar.gz
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.TAR_NAME }}
+          path: ${{ env.TAR_NAME }}
+          retention-days: 90
+
+      # ── 11. Cleanup ─────────────────────────────────────────
       - name: Cleanup signing artifacts
         if: always()
         run: |

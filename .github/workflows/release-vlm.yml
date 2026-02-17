@@ -14,6 +14,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       dmg_name: ${{ steps.version.outputs.dmg_name }}
+      tar_name: ${{ steps.version.outputs.tar_name }}
     steps:
       - name: Extract version from tag
         id: version
@@ -25,8 +26,9 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "dmg_name=claude-kvm-vlm-${VERSION}-darwin-arm64.dmg" >> "$GITHUB_OUTPUT"
+          echo "tar_name=claude-kvm-vlm-${VERSION}-darwin-arm64.tar.gz" >> "$GITHUB_OUTPUT"
 
-  build-dmg:
+  build:
     needs: extract-version
     uses: ./.github/workflows/build-vlm.yml
     with:
@@ -35,16 +37,16 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: [extract-version, build-dmg]
+    needs: [extract-version, build]
     runs-on: ubuntu-latest
     if: success()
 
     steps:
-      - name: Download DMG artifact
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{ needs.extract-version.outputs.dmg_name }}
           path: ${{ runner.temp }}/release
+          merge-multiple: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -54,6 +56,7 @@ jobs:
           body: ""
           files: |
             ${{ runner.temp }}/release/${{ needs.extract-version.outputs.dmg_name }}
+            ${{ runner.temp }}/release/${{ needs.extract-version.outputs.tar_name }}
           draft: false
           prerelease: false
           generate_release_notes: false
