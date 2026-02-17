@@ -53,8 +53,11 @@ jobs:
           path: artifact/
           retention-days: 90
 
-      - name: Commit prebuilt to branch
+      - name: Commit prebuilt to vlm-tool-dev
         run: |
+          git fetch origin vlm-tool-dev
+          git checkout vlm-tool-dev
+
           mkdir -p vendor/libvnc/prebuilt/include/rfb
           cp artifact/libvncclient.a vendor/libvnc/prebuilt/
           cp artifact/include/rfb/*.h vendor/libvnc/prebuilt/include/rfb/
@@ -73,4 +76,4 @@ jobs:
           Source: LibVNCServer-${LIBVNC_VERSION}
           TLS: OpenSSL 3.x
           Compression: zlib + libjpeg-turbo"
-          git push origin HEAD:libvnc-build
+          git push origin vlm-tool-dev
