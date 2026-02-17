@@ -27,7 +27,6 @@ import { getToolDefinitions } from './tools/index.js';
 const env = (key, fallback) => process.env[key] ?? fallback;
 const envInt = (key, fallback) => parseInt(env(key, String(fallback)), 10);
 const envFloat = (key, fallback) => parseFloat(env(key, String(fallback)));
-const envBool = (key, fallback) => env(key, String(fallback)) === 'true';
 
 /** @type {import('./lib/types.js').ClaudeKVMConfig} */
 const config = {
@@ -43,14 +42,10 @@ const config = {
     },
   },
   capture: {
-    screenshot_delay_ms: envInt('CAPTURE_SCREENSHOT_DELAY_MS', 500),
-    stable_frame_timeout_ms: envInt('CAPTURE_STABLE_FRAME_TIMEOUT_MS', 3000),
     stable_frame_threshold: envFloat('CAPTURE_STABLE_FRAME_THRESHOLD', 0.5),
   },
   diff: {
-    enabled: envBool('DIFF_ENABLED', true),
     pixel_threshold: envInt('DIFF_PIXEL_THRESHOLD', 30),
-    change_percent_threshold: envFloat('DIFF_CHANGE_PERCENT_THRESHOLD', 0.5),
   },
 };
 
@@ -112,11 +107,7 @@ const MOUSE_EXEC = {
   double_click: async (i, h) => { await h.mouseDoubleClick(); },
   drag:         async (i, h) => { const p = toNative(i.x, i.y); await h.mouseDrag(p.x, p.y); },
   scroll:       async (i, h) => { await h.scroll(i.direction || 'down', i.amount || 3); },
-  peek:         async () => {},
 };
-
-const CROP_ACTIONS = new Set(['move', 'nudge', 'peek']);
-const CLICK_ACTIONS = new Set(['click', 'click_at', 'right_click', 'double_click']);
 
 // ── Keyboard Action Map ─────────────────────────────────────
 
@@ -125,6 +116,7 @@ const KEYBOARD_EXEC = {
   press: async (i, h) => { await h.keyPress(i.key); },
   combo: async (i, h) => { await h.keyCombo(i.keys); },
   type:  async (i, h) => { await h.typeText(i.text); },
+  paste: async (i, h) => { await h.pasteText(i.text); },
 };
 
 // ── Tool Executor ───────────────────────────────────────────
@@ -134,40 +126,61 @@ const KEYBOARD_EXEC = {
  * @param {Record<string, any>} input
  * @param {HIDController} hid
  * @param {ScreenCapture} capture
- * @returns {Promise<import('./lib/types.js').ToolExecResult & { cursorCropBase64?: string | null }>}
+ * @returns {Promise<import('./lib/types.js').ToolExecResult>}
  */
 async function executeTool(name, input, hid, capture) {
-  if (name === 'task_complete') return { resultText: input.summary, shouldCapture: false, done: true, status: 'success', summary: input.summary };
-  if (name === 'task_failed') return { resultText: input.reason, shouldCapture: false, done: true, status: 'failed', summary: input.reason };
-  if (name === 'screenshot') return { resultText: 'OK', shouldCapture: true, done: false };
-  if (name === 'wait') { await sleep(input.ms); return { resultText: 'OK', shouldCapture: true, done: false }; }
+  // ── Terminal ──
+  if (name === 'task_complete') return { text: input.summary, done: true, status: 'success' };
+  if (name === 'task_failed') return { text: input.reason, done: true, status: 'failed' };
 
+  // ── Screen Instruments ──
+  if (name === 'screenshot') {
+    const base64 = await capture.captureScreenshot();
+    saveScreenshot(base64, name);
+    return { text: 'OK', imageBase64: base64 };
+  }
+
+  if (name === 'cursor_crop') {
+    const pos = hid.getCursorPosition();
+    const base64 = await capture.cursorCrop(pos.x, pos.y, 150);
+    const sp = toScaled(pos);
+    return { text: `(${sp.x}, ${sp.y})`, imageBase64: base64 };
+  }
+
+  if (name === 'diff_check') {
+    const result = await capture.quickDiffCheck();
+    return { text: `changeDetected: ${result.changeDetected}, changePercent: ${result.changePercent.toFixed(2)}%` };
+  }
+
+  if (name === 'set_baseline') {
+    await capture.setBaseline();
+    return { text: 'OK' };
+  }
+
+  // ── Flow Control ──
+  if (name === 'wait') {
+    await sleep(input.ms);
+    return { text: 'OK' };
+  }
+
+  // ── Mouse ──
   if (name === 'mouse') {
     const exec = MOUSE_EXEC[input.action];
-    if (!exec) return { resultText: `Unknown action: ${input.action}`, shouldCapture: false, done: false };
-
+    if (!exec) return { text: `Unknown action: ${input.action}` };
     await exec(input, hid);
-
-    let cursorCropBase64 = null;
-    if (CROP_ACTIONS.has(input.action)) {
-      await capture.captureWithDiff();
-      const pos = hid.getCursorPosition();
-      cursorCropBase64 = await capture.cursorCrop(pos.x, pos.y);
-    }
-
     const pos = toScaled(hid.getCursorPosition());
-    return { resultText: `(${pos.x}, ${pos.y})`, shouldCapture: input.action !== 'peek', done: false, cursorCropBase64 };
+    return { text: `(${pos.x}, ${pos.y})` };
   }
 
+  // ── Keyboard ──
   if (name === 'keyboard') {
     const exec = KEYBOARD_EXEC[input.action];
-    if (!exec) return { resultText: `Unknown action: ${input.action}`, shouldCapture: false, done: false };
-
+    if (!exec) return { text: `Unknown action: ${input.action}` };
     await exec(input, hid);
-    return { resultText: 'OK', shouldCapture: true, done: false };
+    return { text: 'OK' };
   }
 
-  return { resultText: `Unknown tool: ${name}`, shouldCapture: false, done: false };
+  return { text: `Unknown tool: ${name}` };
 }
 
 // ── Tool Call Handler ───────────────────────────────────────
@@ -190,22 +203,11 @@ async function handleToolCall(name, args, hid, capture) {
     return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
   }
 
-  /** @type {Array<{type: string, text?: string, data?: string, mimeType?: string}>} */
-  const content = [{ type: 'text', text: result.resultText }];
+  /** @type {Array<import('@modelcontextprotocol/sdk/types.js').TextContent | import('@modelcontextprotocol/sdk/types.js').ImageContent>} */
+  const content = [{ type: 'text', text: result.text }];
 
-  if (result.shouldCapture) {
-    const stable = await capture.captureStableFrame();
-    saveScreenshot(stable.base64, name);
-
-    if (stable.diff && CLICK_ACTIONS.has(args?.action) && stable.diff.changePercent < config.diff.change_percent_threshold) {
-      content[0].text += ' WARNING: Screen unchanged — click may have missed.';
-    }
-
-    content.push({ type: 'image', data: stable.base64, mimeType: 'image/png' });
-  }
-
-  if (result.cursorCropBase64) {
-    content.push({ type: 'image', data: result.cursorCropBase64, mimeType: 'image/png' });
+  if (result.imageBase64) {
+    content.push({ type: 'image', data: result.imageBase64, mimeType: 'image/png' });
   }
 
   return { content };

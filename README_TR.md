@@ -24,12 +24,8 @@ Proje kök dizinine `.mcp.json` dosyası oluşturun:
         "HID_KEY_HOLD_MS": "50",
         "HID_TYPING_DELAY_MIN_MS": "30",
         "HID_TYPING_DELAY_MAX_MS": "100",
-        "CAPTURE_SCREENSHOT_DELAY_MS": "500",
-        "CAPTURE_STABLE_FRAME_TIMEOUT_MS": "3000",
         "CAPTURE_STABLE_FRAME_THRESHOLD": "0.5",
-        "DIFF_ENABLED": "true",
-        "DIFF_PIXEL_THRESHOLD": "30",
-        "DIFF_CHANGE_PERCENT_THRESHOLD": "0.5"
+        "DIFF_PIXEL_THRESHOLD": "30"
       }
     }
   }
@@ -38,24 +34,34 @@ Proje kök dizinine `.mcp.json` dosyası oluşturun:
 
 Zorunlu olan sadece VNC bağlantı parametreleridir. Diğer parametreler opsiyoneldir ve yukarıdaki varsayılan değerlerle çalışır.
 
-| Parametre                         | Varsayılan  | Açıklama                                             |
-|-----------------------------------|-------------|------------------------------------------------------|
-| `VNC_HOST`                        | `127.0.0.1` | VNC sunucu adresi                                    |
-| `VNC_PORT`                        | `5900`      | VNC port numarası                                    |
-| `VNC_AUTH`                        | `auto`      | Kimlik doğrulama modu (`auto` / `none`)              |
-| `VNC_USERNAME`                    |             | Kullanıcı adı                                        |
-| `VNC_PASSWORD`                    |             | Şifre                                                |
-| `DISPLAY_MAX_DIMENSION`           | `1280`      | Ekran görüntüsünün ölçekleneceği maksimum boyut (px) |
-| `HID_CLICK_HOLD_MS`               | `80`        | Fare tıklama süresi (ms)                             |
-| `HID_KEY_HOLD_MS`                 | `50`        | Tuş basma süresi (ms)                                |
-| `HID_TYPING_DELAY_MIN_MS`         | `30`        | Yazma gecikmesi alt sınır (ms)                       |
-| `HID_TYPING_DELAY_MAX_MS`         | `100`       | Yazma gecikmesi üst sınır (ms)                       |
-| `CAPTURE_SCREENSHOT_DELAY_MS`     | `500`       | İşlem sonrası ekran görüntüsü bekleme süresi (ms)    |
-| `CAPTURE_STABLE_FRAME_TIMEOUT_MS` | `3000`      | Kare sabitleme zaman aşımı (ms)                      |
-| `CAPTURE_STABLE_FRAME_THRESHOLD`  | `0.5`       | Kare sabitleme eşik değeri (%)                       |
-| `DIFF_ENABLED`                    | `true`      | Kare farkı algılamayı etkinleştir                    |
-| `DIFF_PIXEL_THRESHOLD`            | `30`        | Piksel farkı eşik değeri                             |
-| `DIFF_CHANGE_PERCENT_THRESHOLD`   | `0.5`       | Değişim yüzdesi eşik değeri                          |
+| Parametre                        | Varsayılan  | Açıklama                                             |
+|----------------------------------|-------------|------------------------------------------------------|
+| `VNC_HOST`                       | `127.0.0.1` | VNC sunucu adresi                                    |
+| `VNC_PORT`                       | `5900`      | VNC port numarası                                    |
+| `VNC_AUTH`                       | `auto`      | Kimlik doğrulama modu (`auto` / `none`)              |
+| `VNC_USERNAME`                   |             | Kullanıcı adı                                        |
+| `VNC_PASSWORD`                   |             | Şifre                                                |
+| `DISPLAY_MAX_DIMENSION`          | `1280`      | Ekran görüntüsünün ölçekleneceği maksimum boyut (px) |
+| `HID_CLICK_HOLD_MS`             | `80`        | Fare tıklama süresi (ms)                             |
+| `HID_KEY_HOLD_MS`               | `50`        | Tuş basma süresi (ms)                                |
+| `HID_TYPING_DELAY_MIN_MS`       | `30`        | Yazma gecikmesi alt sınır (ms)                       |
+| `HID_TYPING_DELAY_MAX_MS`       | `100`       | Yazma gecikmesi üst sınır (ms)                       |
+| `CAPTURE_STABLE_FRAME_THRESHOLD` | `0.5`       | Diff değişim algılama eşik değeri (%)                |
+| `DIFF_PIXEL_THRESHOLD`          | `30`        | Piksel farkı eşik değeri (0-255)                     |
+
+## Araçlar
+
+| Araç            | Dönen Değer       | Açıklama                                             |
+|-----------------|--------------------|------------------------------------------------------|
+| `mouse`         | `(x, y)`           | Fare işlemleri: move, click, click_at, scroll, drag  |
+| `keyboard`      | `OK`               | Klavye işlemleri: press, combo, type, paste           |
+| `screenshot`    | `OK` + görüntü     | Tam ekran görüntüsü                                 |
+| `cursor_crop`   | `(x, y)` + görüntü | Cursor etrafındaki küçük kesit                       |
+| `diff_check`    | text               | Baseline'a karşı lightweight değişim algılama        |
+| `set_baseline`  | `OK`               | Mevcut ekranı diff referansı olarak kaydet           |
+| `wait`          | `OK`               | Belirtilen süre kadar bekle                          |
+| `task_complete` | özet               | Görevi tamamlandı olarak işaretle                    |
+| `task_failed`   | neden              | Görevi başarısız olarak işaretle                     |
 
 ---
 

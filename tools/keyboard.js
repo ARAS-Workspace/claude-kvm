@@ -34,12 +34,13 @@ export function keyboardTools() {
         '- combo: Key combination with "+" separator. Param: keys.',
         '  Modifiers: ctrl, alt, shift, meta. Examples: ctrl+c, ctrl+l.',
         '- type: Type text character by character. Param: text.',
+        '- paste: Paste text via clipboard. Param: text. Faster and more reliable for long text or special characters.',
       ].join('\n'),
       inputSchema: {
-        action: z.enum(['press', 'combo', 'type']),
+        action: z.enum(['press', 'combo', 'type', 'paste']),
         key: z.string().describe('Key name. For: press.').optional(),
         keys: z.string().describe('Key combo (e.g. "ctrl+c"). For: combo.').optional(),
-        text: z.string().describe('Text to type. For: type.').optional(),
+        text: z.string().describe('Text to type. For: type, paste.').optional(),
       },
     },
   ];

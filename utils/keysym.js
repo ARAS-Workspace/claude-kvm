@@ -132,6 +132,12 @@ export function charToKeysym(ch) {
     return { keysym: code, shift: false };
   }
 
+  // Unicode beyond Latin-1 (Turkish ığşİĞŞ, etc.)
+  // X11 keysym for Unicode: 0x01000000 + code point
+  if (code > 0xFF) {
+    return { keysym: 0x01000000 + code, shift: false };
+  }
+
   return null;
 }
 
