@@ -12,10 +12,6 @@ name: Integration Test
 on:
   workflow_dispatch:
     inputs:
-      task:
-        description: 'Task for Claude to perform on the VM'
-        required: false
-        type: string
       model:
         description: 'Claude model to use'
         required: false
@@ -78,7 +74,6 @@ jobs:
           SCREENSHOTS_DIR: ./test-screenshots
           MODEL: ${{ inputs.model || 'claude-sonnet-4-5-20250929' }}
           MAX_TURNS: ${{ inputs.max_turns || '30' }}
-          TASK: ${{ inputs.task || '' }}
         run: |
           mkdir -p test-screenshots
           asciinema rec -c "node test/integration.js" test-session.cast
