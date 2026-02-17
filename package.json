@@ -1,6 +1,6 @@
 {
   "name": "claude-kvm",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server — control remote desktops via VNC",
   "license": "MIT",
   "author": "Rıza Emre ARAS <r.emrearas@proton.me>",
@@ -8,7 +8,14 @@
     "type": "git",
     "url": "https://github.com/ARAS-Workspace/claude-kvm.git"
   },
-  "keywords": ["mcp", "vnc", "kvm", "claude", "remote-desktop", "automation"],
+  "keywords": [
+    "mcp",
+    "vnc",
+    "kvm",
+    "claude",
+    "remote-desktop",
+    "automation"
+  ],
   "main": "index.js",
   "bin": {
     "claude-kvm": "index.js"
