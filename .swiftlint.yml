@@ -1,0 +1,18 @@
+included:
+  - ClaudeKVM-VLM
+
+excluded:
+  - .build
+  - DerivedData
+
+disabled_rules:
+  - trailing_comma
+  - todo
+
+opt_in_rules:
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+
+line_length:
+  warning: 120
+  error: 150
