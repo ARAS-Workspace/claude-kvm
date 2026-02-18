@@ -12,7 +12,7 @@ extension InputController {
     /// Move + settle wait for hover recognition.
     func mouseHover(x: Int, y: Int) async throws {
         try await mouseMove(x: x, y: y)
-        usleep(400_000) // 400ms hover settle
+        usleep(timing.hoverSettleUs)
     }
 
     /// Relative cursor nudge from current position.

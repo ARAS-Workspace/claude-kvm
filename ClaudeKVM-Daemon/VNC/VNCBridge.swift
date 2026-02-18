@@ -12,18 +12,11 @@ final class VNCBridge: @unchecked Sendable {
     /// Whether the VNC server is macOS Apple VNC (detected from RFB version 003.889 or --macos flag)
     var isMacOS: Bool = false
     var onStateChange: ((VNCConnectionState) -> Void)?
-    var onFrameBufferUpdate: ((Int, Int, Int, Int) -> Void)?
-    var onFrameComplete: (() -> Void)?
-    var onClipboardText: ((String) -> Void)?
-    var onCursorPos: ((Int, Int) -> Void)?
 
     // MARK: Internal Properties (accessed by VNCCallbacks)
 
     let config: VNCConfiguration
     var framebufferUpdateContinuation: AsyncStream<Void>.Continuation?
-    /// Server-reported cursor position (updated by HandleCursorPos callback)
-    var serverCursorX: Int = 0
-    var serverCursorY: Int = 0
 
     // MARK: Private Properties
 
@@ -70,13 +63,10 @@ final class VNCBridge: @unchecked Sendable {
         rfbClientSetClientData(newClient, &vncBridgeTag, unmanaged.toOpaque())
 
         newClient.pointee.MallocFrameBuffer = vncMallocFrameBuffer
-        newClient.pointee.GotFrameBufferUpdate = vncGotFrameBufferUpdate
         newClient.pointee.FinishedFrameBufferUpdate = vncFinishedFrameBufferUpdate
         newClient.pointee.GetPassword = vncGetPassword
         newClient.pointee.GetCredential = vncGetCredential
         newClient.pointee.GotXCutText = vncGotXCutText
-        newClient.pointee.HandleCursorPos = vncHandleCursorPos
-        newClient.pointee.appData.useRemoteCursor = -1 // request PointerPos encoding
 
         if config.connectTimeout > 0 {
             newClient.pointee.connectTimeout = UInt32(config.connectTimeout)

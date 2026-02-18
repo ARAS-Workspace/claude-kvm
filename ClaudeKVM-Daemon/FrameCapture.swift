@@ -7,32 +7,20 @@ extension ClaudeKVMDaemon {
     // MARK: - Diff State
 
     static var baselineBuffer: Data?
-    static let diffThreshold: UInt8 = 30
     static var maxImageDimension = 1280
 
     // MARK: - Diff Check
 
+    /// Direct byte comparison — any pixel change returns true.
     func diffCheck(buffer: UnsafeRawBufferPointer) -> Bool {
         guard let baseline = Self.baselineBuffer else {
             Self.baselineBuffer = Data(buffer)
             return false
         }
 
-        let threshold = Self.diffThreshold
         let count = min(baseline.count, buffer.count)
-
-        var changed = false
-        baseline.withUnsafeBytes { basePtr in
-            let base = basePtr.bindMemory(to: UInt8.self)
-            let current = buffer.bindMemory(to: UInt8.self)
-            for i in stride(from: 0, to: count, by: 4) {
-                if abs(Int(base[i]) - Int(current[i])) > Int(threshold) ||
-                   abs(Int(base[i+1]) - Int(current[i+1])) > Int(threshold) ||
-                   abs(Int(base[i+2]) - Int(current[i+2])) > Int(threshold) {
-                    changed = true
-                    return
-                }
-            }
+        let changed = baseline.withUnsafeBytes { basePtr -> Bool in
+            memcmp(basePtr.baseAddress, buffer.baseAddress, count) != 0
         }
 
         Self.baselineBuffer = Data(buffer)

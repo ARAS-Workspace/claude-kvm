@@ -32,13 +32,10 @@ extension ClaudeKVMDaemon {
                 guard !lineData.isEmpty else { continue }
 
                 do {
-                    let command = try JSONDecoder().decode(Command.self, from: lineData)
-                    await handleCommand(command, vnc: vnc, input: input, scaling: scaling)
+                    let request = try JSONDecoder().decode(PCRequest.self, from: lineData)
+                    await handleRequest(request, vnc: vnc, input: input, scaling: scaling)
                 } catch {
-                    emitEvent(Event(
-                        type: "error",
-                        detail: "Invalid command: \(error.localizedDescription)"
-                    ))
+                    respond(.error(id: nil, code: -32700, message: "Parse error: \(error.localizedDescription)"))
                 }
             }
         }
@@ -46,18 +43,19 @@ extension ClaudeKVMDaemon {
         log("stdin closed — shutting down")
     }
 
-    // MARK: - Command Handler
+    // MARK: - Request Handler
 
-    func handleCommand(
-        _ command: Command,
+    func handleRequest(
+        _ req: PCRequest,
         vnc: VNCBridge,
         input: InputController,
         scaling: DisplayScaling
     ) async {
-        let id = command.id
+        let id = req.id
+        let p = req.params
 
         do {
-            switch command.type {
+            switch req.method {
 
             // ── Screen ────────────────────────────────────────
 
@@ -67,112 +65,97 @@ extension ClaudeKVMDaemon {
                 }) ?? nil else {
                     throw VNCError.sendFailed("No framebuffer")
                 }
-                emitEvent(Event(
-                    id: id, type: "result", success: true,
-                    image: imageData.base64EncodedString(),
-                    scaledWidth: scaling.scaledWidth,
-                    scaledHeight: scaling.scaledHeight
-                ))
+                respond(.success(id: id, image: imageData.base64EncodedString(),
+                                  scaledWidth: scaling.scaledWidth, scaledHeight: scaling.scaledHeight))
 
             case "cursor_crop":
                 let pos = input.cursorPosition
                 let scaledPos = scaling.toScaled(x: pos.x, y: pos.y)
                 guard let imageData = vnc.withFramebuffer({ buf, w, h -> Data? in
-                    cropWithCrosshair(
-                        buffer: buf, width: w, height: h,
-                        centerX: pos.x, centerY: pos.y, radius: 150
-                    )
+                    cropWithCrosshair(buffer: buf, width: w, height: h,
+                                      centerX: pos.x, centerY: pos.y, radius: input.timing.cursorCropRadius)
                 }) ?? nil else {
                     throw VNCError.sendFailed("No framebuffer")
                 }
-                emitEvent(Event(
-                    id: id, type: "result", success: true,
-                    image: imageData.base64EncodedString(),
-                    x: scaledPos.x, y: scaledPos.y
-                ))
+                respond(.success(id: id, image: imageData.base64EncodedString(),
+                                  x: scaledPos.x, y: scaledPos.y))
 
             case "diff_check":
                 let changed = vnc.withFramebuffer { buf, _, _ -> Bool in
                     diffCheck(buffer: buf)
                 } ?? false
-                emitEvent(Event(id: id, type: "result", success: true, detail: "changeDetected: \(changed)"))
+                respond(.success(id: id, detail: "changeDetected: \(changed)"))
 
             case "set_baseline":
                 vnc.withFramebuffer { buf, _, _ in
                     Self.baselineBuffer = Data(buf)
                 }
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
-
-            // ── Cursor ────────────────────────────────────────
-
-            case "cursor_pos":
-                let pos = scaling.toScaled(x: vnc.serverCursorX, y: vnc.serverCursorY)
-                emitEvent(Event(id: id, type: "result", success: true, x: pos.x, y: pos.y))
+                respond(.success(id: id, detail: "OK"))
 
             // ── Mouse ─────────────────────────────────────────
 
             case "mouse_move":
-                let native = nativeXY(command, scaling: scaling)
+                let native = nativeXY(p, scaling: scaling)
                 try await input.mouseMove(x: native.x, y: native.y)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                respond(.success(id: id, detail: "OK"))
 
             case "hover":
-                let native = nativeXY(command, scaling: scaling)
+                let native = nativeXY(p, scaling: scaling)
                 try await input.mouseHover(x: native.x, y: native.y)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                respond(.success(id: id, detail: "OK"))
 
             case "nudge":
-                guard let dx = command.dx, let dy = command.dy else {
+                guard let dx = p?.dx, let dy = p?.dy else {
                     throw VNCError.sendFailed("Missing dx/dy")
                 }
                 let nativeDX = Int((Double(dx) * Double(scaling.nativeWidth) / Double(scaling.scaledWidth)).rounded())
                 let nativeDY = Int((Double(dy) * Double(scaling.nativeHeight) / Double(scaling.scaledHeight)).rounded())
                 try await input.mouseNudge(dx: nativeDX, dy: nativeDY)
                 let pos = scaling.toScaled(x: input.cursorPosition.x, y: input.cursorPosition.y)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK", x: pos.x, y: pos.y))
+                respond(.success(id: id, detail: "OK", x: pos.x, y: pos.y))
 
             case "mouse_click":
-                let native = nativeXY(command, scaling: scaling)
-                let btn = parseButton(command.button)
+                let native = nativeXY(p, scaling: scaling)
+                let btn = parseButton(p?.button)
                 try await input.mouseClick(x: native.x, y: native.y, button: btn)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                respond(.success(id: id, detail: "OK"))
 
             case "mouse_double_click":
-                let native = nativeXY(command, scaling: scaling)
+                let native = nativeXY(p, scaling: scaling)
                 try await input.mouseDoubleClick(x: native.x, y: native.y)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                respond(.success(id: id, detail: "OK"))
 
             case "mouse_drag":
-                guard let toX = command.toX, let toY = command.toY else {
+                guard let toX = p?.toX, let toY = p?.toY else {
                     throw VNCError.sendFailed("Missing toX/toY")
                 }
-                let from = nativeXY(command, scaling: scaling)
+                let from = nativeXY(p, scaling: scaling)
                 let to = scaling.toNative(x: toX, y: toY)
                 try await input.mouseDrag(fromX: from.x, fromY: from.y, toX: to.x, toY: to.y)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                respond(.success(id: id, detail: "OK"))
 
             case "scroll":
-                let native = nativeXY(command, scaling: scaling)
-                guard let dirStr = command.direction,
+                let native = nativeXY(p, scaling: scaling)
+                guard let dirStr = p?.direction,
                       let dir = ScrollDirection(rawValue: dirStr) else {
                     throw VNCError.sendFailed("Missing direction")
                 }
-                try await input.scroll(x: native.x, y: native.y, direction: dir, amount: command.amount ?? 3)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                try await input.scroll(x: native.x, y: native.y, direction: dir, amount: p?.amount ?? 3)
+                respond(.success(id: id, detail: "OK"))
 
             // ── Keyboard ──────────────────────────────────────
 
             case "key_tap":
-                guard let keyName = command.key, let sym = namedKeyToKeysym(keyName) else {
+                guard let keyName = p?.key, let sym = namedKeyToKeysym(keyName) else {
                     throw VNCError.sendFailed("Missing or unknown key")
                 }
                 try await input.keyTap(sym)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                respond(.success(id: id, detail: "OK"))
 
             case "key_combo":
-                if let combo = command.key {
+                if let combo = p?.key {
                     try await input.keyCombo(combo)
-                } else if let keys = command.keys {
+                } else if let keys = p?.keys {
                     let syms = keys.compactMap { namedKeyToKeysym($0) }
                     guard syms.count == keys.count else {
                         throw VNCError.sendFailed("Unknown key in combo: \(keys)")
@@ -181,55 +164,51 @@ extension ClaudeKVMDaemon {
                 } else {
                     throw VNCError.sendFailed("Missing key or keys")
                 }
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                respond(.success(id: id, detail: "OK"))
 
             case "key_type":
-                guard let text = command.text else {
+                guard let text = p?.text else {
                     throw VNCError.sendFailed("Missing text")
                 }
                 try await input.typeText(text)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                respond(.success(id: id, detail: "OK"))
 
             case "paste":
-                guard let text = command.text else {
+                guard let text = p?.text else {
                     throw VNCError.sendFailed("Missing text")
                 }
                 try await input.pasteText(text)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                respond(.success(id: id, detail: "OK"))
 
             // ── Control ───────────────────────────────────────
 
             case "wait":
-                let ms = command.ms ?? 500
+                let ms = p?.ms ?? 500
                 try await Task.sleep(nanoseconds: UInt64(ms) * 1_000_000)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                respond(.success(id: id, detail: "OK"))
 
             case "health":
-                emitEvent(Event(
-                    id: id, type: "result", success: true,
-                    detail: "\(vnc.connectionState)",
-                    scaledWidth: scaling.scaledWidth,
-                    scaledHeight: scaling.scaledHeight
-                ))
+                respond(.success(id: id, detail: "\(vnc.connectionState)",
+                                  scaledWidth: scaling.scaledWidth, scaledHeight: scaling.scaledHeight))
 
             case "shutdown":
-                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                respond(.success(id: id, detail: "OK"))
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { Foundation.exit(0) }
                 return
 
             default:
-                emitEvent(Event(id: id, type: "error", detail: "Unknown command: \(command.type)"))
+                respond(.error(id: id, code: -32601, message: "Method not found: \(req.method)"))
             }
         } catch {
-            emitEvent(Event(id: id, type: "error", detail: "\(error.localizedDescription)"))
+            respond(.error(id: id, message: error.localizedDescription))
         }
     }
 
     // MARK: - Helpers
 
-    func nativeXY(_ command: Command, scaling: DisplayScaling) -> (x: Int, y: Int) {
-        let x = command.x ?? 0
-        let y = command.y ?? 0
+    func nativeXY(_ params: PCRequest.Params?, scaling: DisplayScaling) -> (x: Int, y: Int) {
+        let x = params?.x ?? 0
+        let y = params?.y ?? 0
         return scaling.toNative(x: x, y: y)
     }
 

@@ -15,22 +15,35 @@ enum MouseButton: Int {
 // MARK: - Timing (deterministic, zero randomness)
 
 struct InputTiming {
-    var clickHoldUs: UInt32     = 50_000   // 50ms  — OS register minimum
-    var doubleClickGapUs: UInt32 = 50_000  // 50ms  — inter-click
-    var dragPositionUs: UInt32  = 30_000   // 30ms  — after move to start
-    var dragPressUs: UInt32     = 50_000   // 50ms  — OS drag threshold
-    var dragStepUs: UInt32      = 5_000    // 5ms   — between interpolation points
-    var dragSettleUs: UInt32    = 30_000   // 30ms  — before release
-    var dragPixelsPerStep: Double = 20.0   // 20px  — point density
-    var dragMinSteps: Int       = 10       // minimum interpolation steps
-    var scrollPressUs: UInt32   = 10_000   // 10ms  — scroll press-release gap
-    var scrollTickUs: UInt32    = 20_000   // 20ms  — inter-tick
-    var keyHoldUs: UInt32       = 30_000   // 30ms  — single key hold
-    var comboModUs: UInt32      = 10_000   // 10ms  — between modifier presses
-    var typeKeyUs: UInt32       = 20_000   // 20ms  — key hold during typing
-    var typeInterKeyUs: UInt32  = 20_000   // 20ms  — between characters
-    var typeShiftUs: UInt32     = 10_000   // 10ms  — shift settle
-    var pasteSettleUs: UInt32   = 30_000   // 30ms  — after clipboard write
+    // Mouse
+    var clickHoldUs: UInt32     = 50_000   // 50ms
+    var doubleClickGapUs: UInt32 = 50_000  // 50ms
+    var hoverSettleUs: UInt32   = 400_000  // 400ms
+
+    // Drag
+    var dragPositionUs: UInt32  = 30_000   // 30ms
+    var dragPressUs: UInt32     = 50_000   // 50ms
+    var dragStepUs: UInt32      = 5_000    // 5ms
+    var dragSettleUs: UInt32    = 30_000   // 30ms
+    var dragPixelsPerStep: Double = 20.0   // 20px
+    var dragMinSteps: Int       = 10
+
+    // Scroll
+    var scrollPressUs: UInt32   = 10_000   // 10ms
+    var scrollTickUs: UInt32    = 20_000   // 20ms
+
+    // Keyboard
+    var keyHoldUs: UInt32       = 30_000   // 30ms
+    var comboModUs: UInt32      = 10_000   // 10ms
+
+    // Typing
+    var typeKeyUs: UInt32       = 20_000   // 20ms
+    var typeInterKeyUs: UInt32  = 20_000   // 20ms
+    var typeShiftUs: UInt32     = 10_000   // 10ms
+    var pasteSettleUs: UInt32   = 30_000   // 30ms
+
+    // Display
+    var cursorCropRadius: Int   = 150      // px
 }
 
 // MARK: - Scroll Direction
