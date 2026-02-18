@@ -36,12 +36,10 @@ targets:
         LIBRARY_SEARCH_PATHS:
           - "$(SRCROOT)/vendor/libvnc/prebuilt"
           - "/opt/homebrew/opt/openssl@3/lib"
-          - "/opt/homebrew/opt/jpeg-turbo/lib"
         HEADER_SEARCH_PATHS: "$(SRCROOT)/vendor/libvnc/prebuilt/include"
         OTHER_LDFLAGS:
           - "-lvncclient"
           - "-lz"
-          - "-ljpeg"
           - "-lssl"
           - "-lcrypto"
           - "-lpthread"
