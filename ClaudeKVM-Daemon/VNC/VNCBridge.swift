@@ -93,11 +93,8 @@ final class VNCBridge: @unchecked Sendable {
         log("Connected: \(newClient.pointee.width)×\(newClient.pointee.height)")
         reconnectCount = 0
 
-        // Auto-detect macOS Apple VNC from RFB version 003.889
-        if newClient.pointee.minor == 889 {
-            isMacOS = true
-            log("Detected macOS Apple VNC server (RFB 003.889)")
-        }
+        // macOS detection happens in vncGetCredential (ARD auth type 30)
+        log("macOS mode after connect: \(isMacOS)")
 
         startMessageLoop()
     }

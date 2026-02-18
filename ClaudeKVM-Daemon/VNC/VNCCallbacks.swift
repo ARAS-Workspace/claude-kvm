@@ -53,6 +53,7 @@ func vncGotFrameBufferUpdate(
 /// Called once when all rectangles in a framebuffer update have been received.
 func vncFinishedFrameBufferUpdate(_ client: UnsafeMutablePointer<rfbClient>?) {
     guard let b = bridge(from: client) else { return }
+    FileHandle.standardError.write(Data("[FRAME]\n".utf8))
     b.onFrameComplete?()
     b.framebufferUpdateContinuation?.yield(())
 }
@@ -84,6 +85,7 @@ func vncHandleCursorPos(
     _ x: Int32, _ y: Int32
 ) -> rfbBool {
     guard let b = bridge(from: client) else { return -1 }
+    FileHandle.standardError.write(Data("[CURSOR] \(x),\(y)\n".utf8))
     b.serverCursorX = Int(x)
     b.serverCursorY = Int(y)
     b.onCursorPos?(Int(x), Int(y))
@@ -102,6 +104,10 @@ func vncGetCredential(
     guard let b = bridge(from: client) else { return nil }
 
     if credentialType == rfbCredentialTypeUser {
+        // ARD auth (type 30) requires credentials — this IS macOS
+        b.isMacOS = true
+        FileHandle.standardError.write(Data("[ARD] macOS detected via credential request\n".utf8))
+
         let username = b.config.username ?? ""
         let password = b.config.password ?? ""
 
