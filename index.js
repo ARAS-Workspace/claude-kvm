@@ -8,7 +8,7 @@
  * ██║  ██║██║  ██║██║  ██║███████║
  * ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
  *
- * Copyright (c) 2025 Rıza Emre ARAS <r.emrearas@proton.me>
+ * Copyright (c) 2026 Rıza Emre ARAS <r.emrearas@proton.me>
  *
  * This file is part of Claude KVM.
  * Released under the MIT License — see LICENSE for details.
