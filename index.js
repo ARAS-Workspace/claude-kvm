@@ -233,12 +233,12 @@ async function executeVncCommand(input) {
 // ── MCP Server ──────────────────────────────────────────────
 
 async function main() {
-  log('Claude KVM v2.0.0 — Native VNC proxy');
+  log('Claude KVM v1.0.0 — Native VNC proxy');
 
   spawnDaemon();
 
   const mcpServer = new McpServer(
-    { name: 'claude-kvm', version: '2.0.0' },
+    { name: 'claude-kvm', version: '1.0.0' },
     { capabilities: { tools: {} } },
   );
 
