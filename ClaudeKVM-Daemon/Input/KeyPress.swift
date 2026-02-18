@@ -20,7 +20,7 @@ extension InputController {
         }
 
         let modifiers = Array(keysyms.dropLast())
-        let key = keysyms.last!
+        guard let key = keysyms.last else { return }
 
         // Press modifiers in order
         for mod in modifiers {
