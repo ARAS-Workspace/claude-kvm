@@ -6,9 +6,6 @@ options:
   xcodeVersion: "16.0"
 
 packages:
-  mlx-swift-lm:
-    url: https://github.com/ml-explore/mlx-swift-lm
-    minorVersion: "2.29.1"
   swift-argument-parser:
     url: https://github.com/apple/swift-argument-parser
     from: "1.3.0"
@@ -20,10 +17,6 @@ targets:
     sources:
       - ClaudeKVM-Daemon
     dependencies:
-      - package: mlx-swift-lm
-        product: MLXVLM
-      - package: mlx-swift-lm
-        product: MLXLMCommon
       - package: swift-argument-parser
         product: ArgumentParser
     settings:

@@ -1,95 +1,29 @@
-/**
- *  █████╗ ██████╗  █████╗ ███████╗
- * ██╔══██╗██╔══██╗██╔══██╗██╔════╝
- * ███████║██████╔╝███████║███████╗
- * ██╔══██║██╔══██╗██╔══██║╚════██║
- * ██║  ██║██║  ██║██║  ██║███████║
- * ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
- *
- * Copyright (c) 2025 Riza Emre ARAS <r.emrearas@proton.me>
- *
- * This file is part of Claude KVM.
- * Released under the MIT License - see LICENSE for details.
- */
-
 import Foundation
 import os
 import CLibVNCClient
 
-// MARK: - Connection State
-
-enum VNCConnectionState: Sendable, CustomStringConvertible {
-    case disconnected
-    case connecting
-    case connected(width: Int, height: Int)
-    case error(String)
-
-    var description: String {
-        switch self {
-        case .disconnected: "disconnected"
-        case .connecting: "connecting"
-        case let .connected(w, h): "connected (\(w)×\(h))"
-        case let .error(msg): "error: \(msg)"
-        }
-    }
-
-    var isConnected: Bool {
-        if case .connected = self { return true }
-        return false
-    }
-}
-
-// MARK: - Errors
-
-enum VNCError: LocalizedError {
-    case notConnected
-    case connectionFailed(String)
-    case alreadyConnected
-    case messageLoopFailed
-    case framebufferAllocationFailed
-    case sendFailed(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .notConnected: "Not connected to VNC server."
-        case .connectionFailed(let msg): "VNC connection failed: \(msg)"
-        case .alreadyConnected: "Already connected to a VNC server."
-        case .messageLoopFailed: "VNC message loop encountered an error."
-        case .framebufferAllocationFailed: "Failed to allocate framebuffer."
-        case .sendFailed(let msg): "Failed to send VNC event: \(msg)"
-        }
-    }
-}
-
-// MARK: - Configuration
-
-struct VNCConfiguration {
-    var host: String = "127.0.0.1"
-    var port: Int = 5900
-    var username: String?
-    var password: String?
-    var bitsPerSample: Int32 = 8
-    var samplesPerPixel: Int32 = 3
-    var bytesPerPixel: Int32 = 4
-    var autoReconnect: Bool = true
-    var reconnectDelay: TimeInterval = 2.0
-    var maxReconnectAttempts: Int = 10
-    var messageLoopInterval: UInt32 = 500 // microseconds for WaitForMessage
-}
-
-// MARK: - VNCBridge
-
 /// Swift bridge over LibVNCClient (C). Manages a persistent VNC connection
-/// with a framebuffer accessible as a raw RGBA pointer (zero-copy for VLM).
+/// with a framebuffer accessible as a raw RGBA pointer (zero-copy).
 final class VNCBridge: @unchecked Sendable {
 
     // MARK: Public Properties
 
     var verbose = false
+    /// Whether the VNC server is macOS Apple VNC (detected from RFB version 003.889 or --macos flag)
+    var isMacOS: Bool = false
     var onStateChange: ((VNCConnectionState) -> Void)?
     var onFrameBufferUpdate: ((Int, Int, Int, Int) -> Void)?
     var onFrameComplete: (() -> Void)?
     var onClipboardText: ((String) -> Void)?
+    var onCursorPos: ((Int, Int) -> Void)?
+
+    // MARK: Internal Properties (accessed by VNCCallbacks)
+
+    let config: VNCConfiguration
+    var framebufferUpdateContinuation: AsyncStream<Void>.Continuation?
+    /// Server-reported cursor position (updated by HandleCursorPos callback)
+    var serverCursorX: Int = 0
+    var serverCursorY: Int = 0
 
     // MARK: Private Properties
 
@@ -98,9 +32,7 @@ final class VNCBridge: @unchecked Sendable {
     private let isRunning = OSAllocatedUnfairLock(initialState: false)
     private var messageLoopTask: Task<Void, Never>?
     private let messageQueue = DispatchQueue(label: "vnc.message-loop", qos: .userInteractive)
-    let config: VNCConfiguration
     private var reconnectCount = 0
-    fileprivate var framebufferUpdateContinuation: AsyncStream<Void>.Continuation?
     private var stateStreamContinuation: AsyncStream<VNCConnectionState>.Continuation?
 
     // MARK: Init / Deinit
@@ -123,7 +55,6 @@ final class VNCBridge: @unchecked Sendable {
         updateState(.connecting)
         log("Connecting to \(config.host):\(config.port)")
 
-        // 1. Allocate rfbClient
         guard let newClient = rfbGetClient(
             config.bitsPerSample, config.samplesPerPixel, config.bytesPerPixel
         ) else {
@@ -131,24 +62,26 @@ final class VNCBridge: @unchecked Sendable {
             throw VNCError.connectionFailed("rfbGetClient returned nil")
         }
 
-        // 2. Configure client
         self.client = newClient
         newClient.pointee.serverPort = Int32(config.port)
         newClient.pointee.serverHost = strdup(config.host)
 
-        // 3. Store self reference for C callbacks
         let unmanaged = Unmanaged.passUnretained(self)
         rfbClientSetClientData(newClient, &vncBridgeTag, unmanaged.toOpaque())
 
-        // 4. Register C callbacks
         newClient.pointee.MallocFrameBuffer = vncMallocFrameBuffer
         newClient.pointee.GotFrameBufferUpdate = vncGotFrameBufferUpdate
         newClient.pointee.FinishedFrameBufferUpdate = vncFinishedFrameBufferUpdate
         newClient.pointee.GetPassword = vncGetPassword
         newClient.pointee.GetCredential = vncGetCredential
         newClient.pointee.GotXCutText = vncGotXCutText
+        newClient.pointee.HandleCursorPos = vncHandleCursorPos
+        newClient.pointee.appData.useRemoteCursor = -1 // request PointerPos encoding
 
-        // 5. Connect (TCP + RFB handshake)
+        if config.connectTimeout > 0 {
+            newClient.pointee.connectTimeout = UInt32(config.connectTimeout)
+        }
+
         // rfbInitClient calls rfbClientCleanup internally on failure — do NOT double-free
         var argc: Int32 = 0
         guard rfbInitClient(newClient, &argc, nil) != 0 else {
@@ -160,7 +93,12 @@ final class VNCBridge: @unchecked Sendable {
         log("Connected: \(newClient.pointee.width)×\(newClient.pointee.height)")
         reconnectCount = 0
 
-        // 6. Start message loop
+        // Auto-detect macOS Apple VNC from RFB version 003.889
+        if newClient.pointee.minor == 889 {
+            isMacOS = true
+            log("Detected macOS Apple VNC server (RFB 003.889)")
+        }
+
         startMessageLoop()
     }
 
@@ -202,9 +140,15 @@ final class VNCBridge: @unchecked Sendable {
         }
     }
 
+    func updateState(_ newState: VNCConnectionState) {
+        stateStorage.withLock { $0 = newState }
+        onStateChange?(newState)
+        stateStreamContinuation?.yield(newState)
+        log("State: \(newState)")
+    }
+
     // MARK: - Framebuffer Access (Zero-Copy)
 
-    /// Direct RGBA pointer to the VNC framebuffer. Nil if not connected.
     var framebufferPointer: UnsafeRawPointer? {
         guard let client, client.pointee.frameBuffer != nil else { return nil }
         return UnsafeRawPointer(client.pointee.frameBuffer)
@@ -226,7 +170,6 @@ final class VNCBridge: @unchecked Sendable {
         return Int(client.pointee.width) * bpp
     }
 
-    /// Safe framebuffer access. Body receives (buffer, width, height).
     func withFramebuffer<T>(_ body: (UnsafeRawBufferPointer, Int, Int) -> T) -> T? {
         guard let client, client.pointee.frameBuffer != nil else { return nil }
         let width = Int(client.pointee.width)
@@ -240,7 +183,6 @@ final class VNCBridge: @unchecked Sendable {
         return body(buffer, width, height)
     }
 
-    /// AsyncStream that yields each time a full framebuffer update completes.
     func frameUpdates() -> AsyncStream<Void> {
         AsyncStream { continuation in
             self.framebufferUpdateContinuation = continuation
@@ -250,7 +192,7 @@ final class VNCBridge: @unchecked Sendable {
         }
     }
 
-    // MARK: - Input (dispatched to messageQueue for thread safety)
+    // MARK: - Input
 
     func sendMouseEvent(x: Int, y: Int, buttonMask: Int = 0) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -259,7 +201,6 @@ final class VNCBridge: @unchecked Sendable {
                     continuation.resume(throwing: VNCError.notConnected)
                     return
                 }
-                // rfbBool: TRUE = -1, FALSE = 0
                 if SendPointerEvent(client, Int32(x), Int32(y), Int32(buttonMask)) != 0 {
                     continuation.resume()
                 } else {
@@ -276,8 +217,14 @@ final class VNCBridge: @unchecked Sendable {
                     continuation.resume(throwing: VNCError.notConnected)
                     return
                 }
+                // macOS Apple VNC expects Super_L/R for Command, not Meta_L/R
+                var remappedKey = key
+                if isMacOS {
+                    if key == 0xFFE7 { remappedKey = 0xFFEB }
+                    if key == 0xFFE8 { remappedKey = 0xFFEC }
+                }
                 let rfbDown: rfbBool = down ? -1 : 0
-                if SendKeyEvent(client, key, rfbDown) != 0 {
+                if SendKeyEvent(client, remappedKey, rfbDown) != 0 {
                     continuation.resume()
                 } else {
                     continuation.resume(throwing: VNCError.sendFailed("key event"))
@@ -299,7 +246,7 @@ final class VNCBridge: @unchecked Sendable {
                     return
                 }
                 var cStr = Array(text.utf8CString)
-                let len = Int32(cStr.count - 1) // exclude null terminator
+                let len = Int32(cStr.count - 1)
                 if SendClientCutText(client, &cStr, len) != 0 {
                     continuation.resume()
                 } else {
@@ -320,7 +267,7 @@ final class VNCBridge: @unchecked Sendable {
                     client, 0, 0,
                     Int32(client.pointee.width),
                     Int32(client.pointee.height),
-                    0 // non-incremental = full
+                    0
                 ) != 0 {
                     continuation.resume()
                 } else {
@@ -330,7 +277,7 @@ final class VNCBridge: @unchecked Sendable {
         }
     }
 
-    // MARK: - Message Loop (Private)
+    // MARK: - Message Loop
 
     private func startMessageLoop() {
         isRunning.withLock { $0 = true }
@@ -359,8 +306,6 @@ final class VNCBridge: @unchecked Sendable {
                             }
                         }
 
-                        // result == 0: timeout, no message — keep polling
-                        // Send incremental update request to keep frames flowing
                         _ = SendIncrementalFramebufferUpdateRequest(client)
                         continuation.resume(returning: true)
                     }
@@ -376,7 +321,6 @@ final class VNCBridge: @unchecked Sendable {
     }
 
     private func handleDisconnection() {
-        // Check if this was a deliberate disconnect
         guard isRunning.withLock({ $0 }) else { return }
         isRunning.withLock { $0 = false }
 
@@ -398,7 +342,6 @@ final class VNCBridge: @unchecked Sendable {
         let delay = config.reconnectDelay * Double(min(reconnectCount, 5))
         log("Reconnecting (\(reconnectCount)/\(config.maxReconnectAttempts)) in \(delay)s...")
 
-        // Clean up current client
         if let client {
             if client.pointee.frameBuffer != nil {
                 free(client.pointee.frameBuffer)
@@ -423,15 +366,6 @@ final class VNCBridge: @unchecked Sendable {
         }
     }
 
-    // MARK: - State Helpers (fileprivate for callbacks)
-
-    fileprivate func updateState(_ newState: VNCConnectionState) {
-        stateStorage.withLock { $0 = newState }
-        onStateChange?(newState)
-        stateStreamContinuation?.yield(newState)
-        log("State: \(newState)")
-    }
-
     // MARK: - Logging
 
     func log(_ message: String) {
@@ -444,81 +378,4 @@ final class VNCBridge: @unchecked Sendable {
         formatter.dateFormat = "HH:mm:ss.SSS"
         return formatter.string(from: Date())
     }
-}
-
-// MARK: - C Callback Trampolines
-
-/// Tag for rfbClientSetClientData/rfbClientGetClientData.
-/// The address of this variable is the key — the value is irrelevant.
-var vncBridgeTag: UInt8 = 0
-
-/// Retrieve the VNCBridge instance from a C rfbClient pointer.
-func bridge(from client: UnsafeMutablePointer<rfbClient>?) -> VNCBridge? {
-    guard let client else { return nil }
-    guard let ptr = rfbClientGetClientData(client, &vncBridgeTag) else { return nil }
-    return Unmanaged<VNCBridge>.fromOpaque(ptr).takeUnretainedValue()
-}
-
-/// Called by LibVNC when the framebuffer needs to be (re)allocated.
-private func vncMallocFrameBuffer(_ client: UnsafeMutablePointer<rfbClient>?) -> rfbBool {
-    guard let client else { return 0 }
-    guard let b = bridge(from: client) else { return 0 }
-
-    let width = Int(client.pointee.width)
-    let height = Int(client.pointee.height)
-    let bpp = Int(client.pointee.format.bitsPerPixel) / 8
-    let size = width * height * bpp
-
-    // Free previous buffer if resizing
-    if client.pointee.frameBuffer != nil {
-        free(client.pointee.frameBuffer)
-    }
-
-    guard let buffer = malloc(size) else {
-        b.log("Failed to allocate framebuffer: \(width)×\(height)×\(bpp)")
-        return 0 // FALSE
-    }
-
-    // Zero-fill for clean initial state
-    memset(buffer, 0, size)
-    client.pointee.frameBuffer = buffer.assumingMemoryBound(to: UInt8.self)
-    b.log("Framebuffer allocated: \(width)×\(height) (\(size) bytes)")
-    b.updateState(.connected(width: width, height: height))
-
-    return -1 // rfbBool TRUE = -1
-}
-
-/// Called per rectangle in a framebuffer update.
-private func vncGotFrameBufferUpdate(
-    _ client: UnsafeMutablePointer<rfbClient>?,
-    _ x: Int32, _ y: Int32, _ w: Int32, _ h: Int32
-) {
-    guard let b = bridge(from: client) else { return }
-    b.onFrameBufferUpdate?(Int(x), Int(y), Int(w), Int(h))
-}
-
-/// Called once when all rectangles in a framebuffer update have been received.
-private func vncFinishedFrameBufferUpdate(_ client: UnsafeMutablePointer<rfbClient>?) {
-    guard let b = bridge(from: client) else { return }
-    b.onFrameComplete?()
-    b.framebufferUpdateContinuation?.yield(())
-}
-
-/// Called by LibVNC when a password is needed for VNC authentication.
-/// LibVNC will call free() on the returned pointer.
-private func vncGetPassword(_ client: UnsafeMutablePointer<rfbClient>?) -> UnsafeMutablePointer<CChar>? {
-    guard let b = bridge(from: client) else { return nil }
-    guard let password = b.config.password else { return nil }
-    return strdup(password)
-}
-
-/// Called when the server sends clipboard text.
-private func vncGotXCutText(
-    _ client: UnsafeMutablePointer<rfbClient>?,
-    _ text: UnsafePointer<CChar>?, _ len: Int32
-) {
-    guard let b = bridge(from: client) else { return }
-    guard let text else { return }
-    let string = String(cString: text)
-    b.onClipboardText?(string)
 }
