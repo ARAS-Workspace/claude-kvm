@@ -15,6 +15,7 @@
  *
  * MCP proxy server — spawns a native VNC daemon (claude-kvm-daemon)
  * and exposes a single vnc_command tool to Claude.
+ * Communication: PC (Procedure Call) over stdin/stdout NDJSON.
  */
 
 import { spawn } from 'node:child_process';
@@ -27,7 +28,8 @@ import { vncCommandTool, controlTools } from './tools/index.js';
 
 const env = (key, fallback) => process.env[key] ?? fallback;
 
-const DAEMON_PATH = env('CLAUDE_KVM_DAEMON_PATH', '');
+const DAEMON_PATH = env('CLAUDE_KVM_DAEMON_PATH', 'claude-kvm-daemon');
+const DAEMON_PARAMS = env('CLAUDE_KVM_DAEMON_PARAMETERS', '');
 const VNC_HOST = env('VNC_HOST', '127.0.0.1');
 const VNC_PORT = env('VNC_PORT', '5900');
 const VNC_USERNAME = env('VNC_USERNAME', '');
@@ -45,37 +47,41 @@ function log(msg) {
 let daemon = null;
 let daemonReady = false;
 const display = { width: 1280, height: 800 };
-const pendingRequests = new Map(); // id → { resolve, reject, timer }
+const pendingRequests = new Map();
 let lineBuffer = '';
 
-function spawnDaemon() {
-  if (!DAEMON_PATH) {
-    log('CLAUDE_KVM_DAEMON_PATH not set — daemon will not start');
-    return;
-  }
-
+function buildDaemonArgs() {
   const args = ['--host', VNC_HOST, '--port', VNC_PORT];
   if (VNC_USERNAME) args.push('--username', VNC_USERNAME);
   if (VNC_PASSWORD) args.push('--password', VNC_PASSWORD);
 
+  // Extra parameters — passed directly to daemon CLI
+  if (DAEMON_PARAMS) {
+    const extra = DAEMON_PARAMS.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+    args.push(...extra.map((s) => s.replace(/^['"]|['"]$/g, '')));
+  }
+
+  return args;
+}
+
+function spawnDaemon() {
+  const args = buildDaemonArgs();
   log(`Spawning daemon: ${DAEMON_PATH} ${args.join(' ')}`);
 
   daemon = spawn(DAEMON_PATH, args, {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
-  // Read stdout line by line (NDJSON)
   daemon.stdout.on('data', (chunk) => {
     lineBuffer += chunk.toString();
-    let newlineIdx;
-    while ((newlineIdx = lineBuffer.indexOf('\n')) !== -1) {
-      const line = lineBuffer.slice(0, newlineIdx).trim();
-      lineBuffer = lineBuffer.slice(newlineIdx + 1);
-      if (line) handleDaemonEvent(line);
+    let idx;
+    while ((idx = lineBuffer.indexOf('\n')) !== -1) {
+      const line = lineBuffer.slice(0, idx).trim();
+      lineBuffer = lineBuffer.slice(idx + 1);
+      if (line) handleDaemonMessage(line);
     }
   });
 
-  // Forward stderr to our stderr
   daemon.stderr.on('data', (chunk) => {
     process.stderr.write(chunk);
   });
@@ -84,7 +90,6 @@ function spawnDaemon() {
     log(`Daemon exited with code ${code}`);
     daemonReady = false;
     daemon = null;
-    // Reject all pending requests
     for (const [, req] of pendingRequests) {
       clearTimeout(req.timer);
       req.reject(new Error('Daemon exited'));
@@ -93,57 +98,50 @@ function spawnDaemon() {
   });
 
   daemon.on('error', (err) => {
-    log(`Daemon error: ${err.message}`);
+    log(`Daemon spawn error: ${err.message}`);
   });
 }
 
-function handleDaemonEvent(line) {
-  let event;
+function handleDaemonMessage(line) {
+  let msg;
   try {
-    event = JSON.parse(line);
+    msg = JSON.parse(line);
   } catch {
     log(`Invalid daemon JSON: ${line}`);
     return;
   }
 
-  // Handle ready event
-  if (event.type === 'ready') {
-    daemonReady = true;
-    if (event.display.width) display.width = event.display.width;
-    if (event.display.height) display.height = event.display.height;
-    log(`Daemon ready — display ${display.width}×${display.height}`);
-    return;
-  }
-
-  // Handle vnc_state events (no request id)
-  if (event.type === 'vnc_state') {
-    log(`VNC state: ${event.detail}`);
-    return;
-  }
-
-  // Handle response to a pending request
-  if (event.id && pendingRequests.has(event.id)) {
-    const req = pendingRequests.get(event.id);
-    pendingRequests.delete(event.id);
-    clearTimeout(req.timer);
-
-    if (event.type === 'status') {
-      // Status events are intermediate — re-register and wait for result
-      pendingRequests.set(event.id, req);
-      return;
+  // PC notification — has method, no id
+  if (msg.method) {
+    const { scaledWidth, scaledHeight, state } = msg.params || {};
+    if (msg.method === 'ready') {
+      daemonReady = true;
+      if (scaledWidth) display.width = scaledWidth;
+      if (scaledHeight) display.height = scaledHeight;
+      log(`Daemon ready — display ${display.width}×${display.height}`);
+    } else if (msg.method === 'vnc_state') {
+      log(`VNC state: ${state}`);
     }
+    return;
+  }
 
-    req.resolve(event);
+  // PC response — has id
+  if (msg.id !== undefined && pendingRequests.has(msg.id)) {
+    const req = pendingRequests.get(msg.id);
+    pendingRequests.delete(msg.id);
+    clearTimeout(req.timer);
+    req.resolve(msg);
   }
 }
 
 /**
- * Send a command to the daemon and wait for response.
- * @param {object} command - Command to send (type, params...)
+ * Send a PC request to the daemon and wait for response.
+ * @param {string} method - PC method name
+ * @param {object} [params] - Method parameters
  * @param {number} [timeoutMs=30000] - Timeout in milliseconds
- * @returns {Promise<object>} - Daemon response event
+ * @returns {Promise<object>} - Daemon PC response
  */
-function sendCommand(command, timeoutMs = 30000) {
+function sendRequest(method, params, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     if (!daemon || !daemonReady) {
       reject(new Error('Daemon not ready. Check CLAUDE_KVM_DAEMON_PATH and VNC credentials.'));
@@ -151,17 +149,18 @@ function sendCommand(command, timeoutMs = 30000) {
     }
 
     const id = randomUUID();
-    command.id = id;
 
     const timer = setTimeout(() => {
       pendingRequests.delete(id);
-      reject(new Error(`Daemon command timed out after ${timeoutMs}ms`));
+      reject(new Error(`Daemon request timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
     pendingRequests.set(id, { resolve, reject, timer });
 
-    const json = JSON.stringify(command) + '\n';
-    daemon.stdin.write(json);
+    const request = { method, id };
+    if (params && Object.keys(params).length > 0) request.params = params;
+
+    daemon.stdin.write(JSON.stringify(request) + '\n');
   });
 }
 
@@ -191,38 +190,41 @@ function waitForReady(timeoutMs = 30000) {
 async function executeVncCommand(input) {
   const { action, ...params } = input;
 
-  // Map action to daemon command type
-  const command = { type: action, ...params };
+  const response = await sendRequest(action, params);
 
-  // VLM prompt uses 'payload' field
-  if (action === 'vlm_prompt' && params.payload) {
-    command.payload = params.payload;
+  // PC error response
+  if (response.error) {
+    return {
+      content: [{ type: 'text', text: `Error: ${response.error.message}` }],
+      isError: true,
+    };
   }
 
-  const response = await sendCommand(command, action === 'vlm_prompt' ? 120000 : 30000);
-
-  // Build MCP response
+  const { detail, image, x, y, scaledWidth, scaledHeight } = response.result || {};
   const content = [];
 
-  if (response.type === 'error') {
-    return { content: [{ type: 'text', text: `Error: ${response.detail}` }], isError: true };
+  // Text detail
+  if (detail) {
+    content.push({ type: 'text', text: detail });
   }
 
-  // Text result
-  if (response.detail) {
-    content.push({ type: 'text', text: response.detail });
-  } else if (response.success) {
+  // Image
+  if (image) {
+    content.push({ type: 'image', data: image, mimeType: 'image/png' });
+  }
+
+  // Cursor position (nudge, cursor_crop)
+  if (x !== undefined && y !== undefined) {
+    content.push({ type: 'text', text: `cursor: (${x}, ${y})` });
+  }
+
+  // Display dimensions (health — no image)
+  if (scaledWidth !== undefined && !image) {
+    content.push({ type: 'text', text: `display: ${scaledWidth}×${scaledHeight}` });
+  }
+
+  if (content.length === 0) {
     content.push({ type: 'text', text: 'OK' });
-  }
-
-  // Image result
-  if (response.image) {
-    content.push({ type: 'image', data: response.image, mimeType: 'image/png' });
-  }
-
-  // Cursor position
-  if (response.x !== undefined && response.y !== undefined) {
-    content.push({ type: 'text', text: `cursor: (${response.x}, ${response.y})` });
   }
 
   return { content };
@@ -233,22 +235,17 @@ async function executeVncCommand(input) {
 async function main() {
   log('Claude KVM v2.0.0 — Native VNC proxy');
 
-  // Spawn daemon
   spawnDaemon();
 
-  // Create MCP server immediately (don't block on daemon ready)
   const mcpServer = new McpServer(
     { name: 'claude-kvm', version: '2.0.0' },
     { capabilities: { tools: {} } },
   );
 
-  // Wait for daemon to connect before registering tools with dimensions
-  if (DAEMON_PATH) {
-    try {
-      await waitForReady(30000);
-    } catch (err) {
-      log(`Warning: ${err.message} — registering with default dimensions`);
-    }
+  try {
+    await waitForReady(30000);
+  } catch (err) {
+    log(`Warning: ${err.message} — registering with default dimensions`);
   }
 
   // Register vnc_command tool
@@ -281,16 +278,14 @@ async function main() {
     );
   }
 
-  // Start MCP transport
   const transport = new StdioServerTransport();
   await mcpServer.connect(transport);
   log('MCP server connected on stdio');
 
-  // Cleanup on exit
   process.on('SIGINT', () => {
     log('Shutting down...');
     if (daemon) {
-      daemon.stdin.write(JSON.stringify({ type: 'shutdown' }) + '\n');
+      daemon.stdin.write(JSON.stringify({ method: 'shutdown' }) + '\n');
       setTimeout(() => { daemon?.kill(); process.exit(0); }, 500);
     } else {
       process.exit(0);
