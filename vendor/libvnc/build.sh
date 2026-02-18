@@ -97,28 +97,6 @@ download_source() {
   ok "Source extracted"
 }
 
-# ── Detect libjpeg ─────────────────────────────────────────
-
-detect_jpeg() {
-  if command -v brew &>/dev/null; then
-    local brew_prefix
-    brew_prefix="$(brew --prefix jpeg-turbo 2>/dev/null || true)"
-    if [[ -n "${brew_prefix}" && -d "${brew_prefix}" ]]; then
-      JPEG_INCLUDE_DIR="${brew_prefix}/include"
-      JPEG_LIBRARY="${brew_prefix}/lib/libjpeg.a"
-      if [[ -f "${JPEG_LIBRARY}" ]]; then
-        ok "Using Homebrew libjpeg-turbo: ${brew_prefix}"
-        return
-      fi
-    fi
-  fi
-
-  # Disable JPEG if not found (non-critical)
-  JPEG_INCLUDE_DIR=""
-  JPEG_LIBRARY=""
-  log "libjpeg not found — Tight encoding will be disabled (optional)"
-}
-
 # ── Detect OpenSSL ─────────────────────────────────────────
 
 detect_openssl() {
@@ -169,9 +147,7 @@ build_libvncclient() {
         -DWITH_OPENSSL=ON \
         -DOPENSSL_ROOT_DIR="${OPENSSL_ROOT_DIR}" \
         -DWITH_ZLIB=ON \
-        -DWITH_JPEG=ON \
-        -DJPEG_INCLUDE_DIR="${JPEG_INCLUDE_DIR}" \
-        -DJPEG_LIBRARY="${JPEG_LIBRARY}" \
+        -DWITH_JPEG=OFF \
         -DWITH_PNG=OFF \
         -DWITH_THREADS=ON \
         -DWITH_IPv6=ON \
@@ -314,7 +290,6 @@ main() {
   log "LibVNCClient ${LIBVNC_VERSION} — Static Build for macOS ${ARCH}"
   echo ""
 
-  detect_jpeg
   detect_openssl
   download_source
   build_libvncclient

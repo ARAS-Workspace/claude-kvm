@@ -25,7 +25,7 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          brew install cmake openssl@3 jpeg-turbo
+          brew install cmake openssl@3
 
       - name: Build static library
         run: |
