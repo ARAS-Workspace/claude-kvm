@@ -32,6 +32,19 @@ targets:
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         OTHER_SWIFT_FLAGS: "-parse-as-library"
+        SWIFT_INCLUDE_PATHS: "$(SRCROOT)/vendor/libvnc/prebuilt"
+        LIBRARY_SEARCH_PATHS:
+          - "$(SRCROOT)/vendor/libvnc/prebuilt"
+          - "/opt/homebrew/opt/openssl@3/lib"
+          - "/opt/homebrew/opt/jpeg-turbo/lib"
+        HEADER_SEARCH_PATHS: "$(SRCROOT)/vendor/libvnc/prebuilt/include"
+        OTHER_LDFLAGS:
+          - "-lvncclient"
+          - "-lz"
+          - "-ljpeg"
+          - "-lssl"
+          - "-lcrypto"
+          - "-lpthread"
       configs:
         Release:
           SWIFT_OPTIMIZATION_LEVEL: -O
