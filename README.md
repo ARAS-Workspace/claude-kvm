@@ -1,100 +1,94 @@
 # Claude KVM
 
-Claude KVM is an MCP tool that controls your remote desktop environment over VNC, with optional SSH access.
+Claude KVM is an MCP tool that controls remote desktop environments over VNC. It consists of a thin JS proxy layer (MCP server) and a platform-native Swift VNC daemon running on your macOS system.
 
 ## Architecture
-
-Claude KVM follows an **atomic instrument** design — each tool does one thing, Claude orchestrates the flow. The system provides three independent channels, each optimized for a different type of interaction:
 
 ```mermaid
 graph TB
     subgraph MCP["MCP Client (Claude)"]
-        AI["🤖 Claude"]
+        AI["Claude"]
     end
 
-    subgraph Server["claude-kvm · MCP Server (stdio)"]
+    subgraph Proxy["claude-kvm · MCP Proxy (stdio)"]
         direction TB
-        Router["Tool Router<br/><code>index.js</code>"]
-
-        subgraph Channels["Channels"]
-            direction LR
-            subgraph VNC_Ch["VNC Channel"]
-                direction TB
-                VNC_Client["VNC Client<br/><code>lib/vnc.js</code>"]
-                HID["HID Controller<br/><code>lib/hid.js</code>"]
-                Capture["Screen Capture<br/><code>lib/capture.js</code>"]
-            end
-
-            subgraph SSH_Ch["SSH Channel"]
-                direction TB
-                SSH_Client["SSH Client<br/><code>lib/ssh.js</code>"]
-            end
-
-            subgraph VLM_Ch["VLM Channel"]
-                direction TB
-                VLM_Bin["claude-kvm-vlm<br/><i>Apple Silicon binary</i>"]
-            end
-        end
+        Server["MCP Server<br/><code>index.js</code>"]
+        Tools["Tool Definitions<br/><code>tools/index.js</code>"]
+        Server --> Tools
     end
 
-    subgraph Local["Host Machine (Apple Silicon)"]
-        MLX["MLX Framework<br/><i>FastVLM 0.5B</i>"]
+    subgraph Daemon["claude-kvm-daemon · Native VNC Client (stdin/stdout)"]
+        direction TB
+        CMD["Command Handler<br/><i>PC Dispatch</i>"]
+        Scale["Display Scaling<br/><i>Scaled ↔ Native</i>"]
+
+        subgraph Screen["Screen"]
+            Capture["Frame Capture<br/><i>PNG · Crop · Diff</i>"]
+        end
+
+        subgraph InputGroup["Input"]
+            Mouse["Mouse<br/><i>Click · Drag · Move · Scroll</i>"]
+            KB["Keyboard<br/><i>Tap · Combo · Type · Paste</i>"]
+        end
+
+        VNC["VNC Bridge<br/><i>LibVNCClient 0.9.15</i>"]
+
+        CMD --> Scale
+        Scale --> Capture
+        Scale --> Mouse
+        Scale --> KB
+        Capture -.->|"framebuffer"| VNC
+        Mouse -->|"pointer events"| VNC
+        KB -->|"key events"| VNC
     end
 
     subgraph Target["Target Machine"]
         VNC_Server["VNC Server<br/><i>:5900</i>"]
-        SSH_Server["SSH Server<br/><i>:22</i>"]
-
-        Desktop["🖥️ Desktop Environment"]
-        Shell["💻 Shell"]
+        Desktop["Desktop Environment"]
+        VNC_Server --> Desktop
     end
 
-    AI <--->|"stdio<br/>JSON-RPC"| Router
+    AI <-->|"stdio<br/>JSON-RPC"| Server
+    Server <-->|"stdin/stdout<br/>PC (NDJSON)"| CMD
+    VNC <-->|"RFB Protocol<br/>TCP :5900"| VNC_Server
 
-    Router --> VNC_Client
-    Router --> HID
-    Router --> Capture
-    Router --> SSH_Client
-    Router --> VLM_Bin
-
-    VNC_Client <-->|"RFB Protocol<br/>TCP :5900"| VNC_Server
-    HID --> VNC_Client
-    Capture --> VNC_Client
-    Capture -->|"PNG crop"| VLM_Bin
-
-    SSH_Client <-->|"SSH Protocol<br/>TCP :22"| SSH_Server
-    VLM_Bin -->|"stdin: PNG<br/>stdout: text"| MLX
-
-    VNC_Server --> Desktop
-    SSH_Server --> Shell
-
-    classDef server fill:#1a1a2e,stroke:#16213e,color:#e5e5e5
-    classDef channel fill:#0f3460,stroke:#533483,color:#e5e5e5
+    classDef proxy fill:#1a1a2e,stroke:#16213e,color:#e5e5e5
+    classDef daemon fill:#0f3460,stroke:#533483,color:#e5e5e5
     classDef target fill:#1a1a2e,stroke:#e94560,color:#e5e5e5
-    classDef local fill:#1a1a2e,stroke:#533483,color:#e5e5e5
 
-    class Router server
-    class VNC_Client,HID,Capture,SSH_Client,VLM_Bin channel
-    class VNC_Server,SSH_Server,Desktop,Shell target
-    class MLX local
+    class Server,Tools proxy
+    class CMD,Scale,VNC,Capture,Mouse,KB daemon
+    class VNC_Server,Desktop target
 ```
 
-### Channel Overview
+### Layers
 
-| Channel | Transport         | Purpose                                          | Tools                                                                     |
-|---------|-------------------|--------------------------------------------------|---------------------------------------------------------------------------|
-| **VNC** | RFB over TCP      | Visual control — screen capture, mouse, keyboard | `screenshot` `cursor_crop` `diff_check` `set_baseline` `mouse` `keyboard` |
-| **SSH** | SSH over TCP      | Text I/O — shell commands, file ops, osascript   | `ssh`                                                                     |
-| **VLM** | stdin/stdout pipe | Pixel → text — on-device OCR and visual Q&A      | `vlm_query`                                                               |
+| Layer          | Language                | Role                                                                 | Communication            |
+|----------------|-------------------------|----------------------------------------------------------------------|--------------------------|
+| **MCP Proxy**  | JavaScript (Node.js)    | Communicates with Claude over MCP protocol, manages daemon lifecycle | stdio JSON-RPC           |
+| **VNC Daemon** | Swift/C (Apple Silicon) | VNC connection, screen capture, mouse/keyboard input injection       | stdin/stdout PC (NDJSON) |
 
-### How They Work Together
+### PC (Procedure Call) Protocol
 
-Each channel has a strength. Claude picks the most efficient one — or combines them:
+Communication between the proxy and daemon uses the PC protocol over NDJSON:
 
-- **Read a web page** → VNC navigates, VLM reads text from a region, no screenshot needed
-- **Run a shell command** → SSH returns text directly, faster than typing in a terminal via VNC
-- **Verify a change** → `diff_check` detects change (5ms, no image), `cursor_crop` confirms placement (small image), `screenshot` only when needed (full image)
-- **Debug a dialog** → VLM reads the button labels, SSH runs `osascript` to get window info, VNC clicks the right button
+```
+Request:      {"method":"<name>","params":{...},"id":<int|string>}
+Response:     {"result":{...},"id":<int|string>}
+Error:        {"error":{"code":<int>,"message":"..."},"id":<int|string>}
+Notification: {"method":"<name>","params":{...}}
+```
+
+### Coordinate Scaling
+
+The VNC server's native resolution is scaled down to fit within `--max-dimension` (default: 1280px). Claude works more consistently with scaled coordinates — the daemon handles the conversion in the background:
+
+```
+Native:  4220 x 2568  (VNC server framebuffer)
+Scaled:  1280 x 779   (what Claude sees and targets)
+
+mouse_click(640, 400) → VNC receives (2110, 1284)
+```
 
 ### Three-Layer Screen Strategy
 
@@ -102,26 +96,38 @@ Claude minimizes token cost with a progressive verification approach:
 
 ```
 diff_check  →  changeDetected: true/false     ~5ms   (text only, no image)
-cursor_crop →  300×300px around cursor         ~200ms (small image)
-screenshot  →  full screen capture             ~1200ms (full image, HiDPI)
+cursor_crop →  crop around cursor             ~50ms  (small image)
+screenshot  →  full screen capture            ~200ms (full image)
 ```
 
 Start cheap, escalate only when needed.
 
-### Coordinate Scaling
+---
 
-The VNC server's native resolution is scaled down to fit within `DISPLAY_MAX_DIMENSION` (default: 1280px). Claude works in scaled coordinates — the server transparently converts between native and scaled space:
+## Installation
 
+### Requirements
+
+- macOS (Apple Silicon / aarch64)
+- Node.js (LTS)
+
+### Daemon
+
+```bash
+brew tap ARAS-Workspace/tap
+brew install claude-kvm-daemon
 ```
-Native:  3840 × 2400  (VNC server framebuffer)
-Scaled:  1280 × 800   (what Claude sees and targets)
 
-click_at(640, 400) → VNC receives (1920, 1200)
-```
+> [!NOTE]
+> `claude-kvm-daemon` is compiled and code-signed via CI (GitHub Actions). The build output is packaged in two formats: a `.tar.gz` archive for Homebrew distribution and a `.dmg` disk image for notarization. The DMG is submitted to Apple servers for notarization within the same workflow — the process can be tracked from CI logs. The notarized DMG is available as a CI Artifact; the archived `.tar.gz` is also published as a release on the repository. Homebrew installation tracks this release.
+>
+> - [Release](https://github.com/ARAS-Workspace/claude-kvm/releases/tag/daemon-v1.0.0) · [Build Workflow](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22148745112) · [Source Code](https://github.com/ARAS-Workspace/claude-kvm/tree/daemon-tool)
+> - [LibVNC Build](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22122975416) · [LibVNC Branch](https://github.com/ARAS-Workspace/claude-kvm/tree/libvnc-build)
+> - [Homebrew Tap](https://github.com/ARAS-Workspace/homebrew-tap)
 
-## Usage
+### MCP Configuration
 
-Create a `.mcp.json` file in your project root directory:
+Create a `.mcp.json` file in your project directory:
 
 ```json
 {
@@ -132,113 +138,152 @@ Create a `.mcp.json` file in your project root directory:
       "env": {
         "VNC_HOST": "192.168.1.100",
         "VNC_PORT": "5900",
-        "VNC_AUTH": "auto",
         "VNC_USERNAME": "user",
         "VNC_PASSWORD": "pass",
-        "SSH_HOST": "192.168.1.100",
-        "SSH_USER": "user",
-        "SSH_PASSWORD": "pass",
-        "CLAUDE_KVM_VLM_TOOL_PATH": "/path/to/claude-kvm-vlm"
+        "CLAUDE_KVM_DAEMON_PATH": "/opt/homebrew/bin/claude-kvm-daemon",
+        "CLAUDE_KVM_DAEMON_PARAMETERS": "--max-dimension 1280 -v"
       }
     }
   }
 }
 ```
 
-Only the VNC connection parameters are required. SSH and all other parameters are optional.
-
 ### Configuration
 
-#### VNC
+#### MCP Proxy (ENV)
 
-| Parameter                    | Default     | Description                                    |
-|------------------------------|-------------|------------------------------------------------|
-| `VNC_HOST`                   | `127.0.0.1` | VNC server address                             |
-| `VNC_PORT`                   | `5900`      | VNC port number                                |
-| `VNC_AUTH`                   | `auto`      | Authentication mode (`auto` / `none`)          |
-| `VNC_USERNAME`               |             | Username (for VeNCrypt Plain / ARD)            |
-| `VNC_PASSWORD`               |             | Password                                       |
-| `VNC_CONNECT_TIMEOUT_MS`     | `10000`     | TCP connection timeout (ms)                    |
-| `VNC_SCREENSHOT_TIMEOUT_MS`  | `3000`      | Screenshot frame wait timeout (ms)             |
+| Parameter                      | Default             | Description                                        |
+|--------------------------------|---------------------|----------------------------------------------------|
+| `VNC_HOST`                     | `127.0.0.1`         | VNC server address                                 |
+| `VNC_PORT`                     | `5900`              | VNC port number                                    |
+| `VNC_USERNAME`                 |                     | Username (required for ARD)                        |
+| `VNC_PASSWORD`                 |                     | Password                                           |
+| `CLAUDE_KVM_DAEMON_PATH`       | `claude-kvm-daemon` | Daemon binary path (not needed if already in PATH) |
+| `CLAUDE_KVM_DAEMON_PARAMETERS` |                     | Additional CLI arguments for the daemon            |
 
-#### SSH (optional)
+#### Daemon Parameters (CLI)
 
-| Parameter       | Default | Description                                  |
-|-----------------|---------|----------------------------------------------|
-| `SSH_HOST`      |         | SSH server address (required to enable SSH)  |
-| `SSH_USER`      |         | SSH username (required to enable SSH)        |
-| `SSH_PASSWORD`  |         | SSH password (for password auth)             |
-| `SSH_KEY`       |         | Path to private key file (for key auth)      |
-| `SSH_PORT`      | `22`    | SSH port number                              |
+Additional arguments passed to the daemon via `CLAUDE_KVM_DAEMON_PARAMETERS`:
 
-The SSH tool is only registered when both `SSH_HOST` and `SSH_USER` are set. Authentication uses either password or key — whichever is provided.
-
-#### VLM (optional, macOS only)
-
-| Parameter                  | Default | Description                                                                                    |
-|----------------------------|---------|------------------------------------------------------------------------------------------------|
-| `CLAUDE_KVM_VLM_TOOL_PATH` |         | Absolute path to `claude-kvm-vlm` binary (macOS arm64). Enables the `vlm_query` tool when set. |
-
-The `vlm_query` tool is only registered when `CLAUDE_KVM_VLM_TOOL_PATH` is set. Requires Apple Silicon.
-
-##### Quick Install
-
-```bash
-brew tap ARAS-Workspace/tap
-brew install claude-kvm-vlm
+```
+"CLAUDE_KVM_DAEMON_PARAMETERS": "--max-dimension 800 --click-hold-ms 80 --key-hold-ms 50 -v"
 ```
 
-The `claude-kvm-vlm` binary is built, code-signed and notarized via CI:
+All timing defaults are defined in the [`InputTiming`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/KeySymbols.swift) struct.
 
-- [Build Workflow](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22114321867)
-- [Source Code](https://github.com/ARAS-Workspace/claude-kvm/tree/vlm-tool)
+**General:** [`main.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/main.swift) · [`DisplayScaling.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/DisplayScaling.swift) · [`VNCBridge.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/VNC/VNCBridge.swift)
 
-#### Display & Input
+| Parameter           | Default | Description                            |
+|---------------------|---------|----------------------------------------|
+| `--max-dimension`   | `1280`  | Maximum display scaling dimension (px) |
+| `--connect-timeout` |         | VNC connection timeout (seconds)       |
+| `--bits-per-sample` |         | Bits per pixel sample                  |
+| `--no-reconnect`    |         | Disable automatic reconnection         |
+| `-v, --verbose`     |         | Verbose logging (stderr)               |
 
-| Parameter                    | Default     | Description                                    |
-|------------------------------|-------------|------------------------------------------------|
-| `DISPLAY_MAX_DIMENSION`      | `1280`      | Maximum dimension to scale screenshots to (px) |
-| `HID_CLICK_HOLD_MS`          | `80`        | Mouse click hold duration (ms)                 |
-| `HID_KEY_HOLD_MS`            | `50`        | Key press hold duration (ms)                   |
-| `HID_TYPING_DELAY_MIN_MS`    | `30`        | Typing delay lower bound (ms)                  |
-| `HID_TYPING_DELAY_MAX_MS`    | `100`       | Typing delay upper bound (ms)                  |
-| `HID_SCROLL_EVENTS_PER_STEP` | `5`         | VNC scroll events per scroll step              |
-| `DIFF_PIXEL_THRESHOLD`       | `30`        | Per-channel pixel difference threshold (0-255) |
+**Mouse timing:** [`MouseClick.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/MouseClick.swift) · [`MouseMovement.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/MouseMovement.swift)
 
-## Tools
+| Parameter               | Default | Description                |
+|-------------------------|---------|----------------------------|
+| `--click-hold-ms`       | `50`    | Click hold duration        |
+| `--double-click-gap-ms` | `50`    | Double-click gap delay     |
+| `--hover-settle-ms`     | `400`   | Hover settle wait duration |
 
-| Tool            | Returns          | Description                                               |
-|-----------------|------------------|-----------------------------------------------------------|
-| `mouse`         | `(x, y)`         | Mouse actions: move, hover, click, click_at, scroll, drag |
-| `keyboard`      | `OK`             | Keyboard actions: press, combo, type, paste               |
-| `screenshot`    | `OK` + image     | Capture full screen                                       |
-| `cursor_crop`   | `(x, y)` + image | Small crop around cursor position                         |
-| `diff_check`    | `changeDetected` | Lightweight pixel change detection against baseline       |
-| `set_baseline`  | `OK`             | Save current screen as diff reference                     |
-| `health_check`  | JSON             | VNC/SSH status, resolution, uptime, memory                |
-| `ssh`           | stdout/stderr    | Execute a command on the remote machine via SSH           |
-| `vlm_query`     | text             | On-device VLM query on a cropped screen region (macOS)    |
-| `wait`          | `OK`             | Wait for a specified duration                             |
-| `task_complete` | summary          | Mark task as completed                                    |
-| `task_failed`   | reason           | Mark task as failed                                       |
+**Drag timing:** [`MouseDrag.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/MouseDrag.swift)
 
-## Authentication
+| Parameter                | Default | Description                            |
+|--------------------------|---------|----------------------------------------|
+| `--drag-position-ms`     | `30`    | Pre-drag position wait                 |
+| `--drag-press-ms`        | `50`    | Drag press hold threshold              |
+| `--drag-step-ms`         | `5`     | Delay between interpolation points     |
+| `--drag-settle-ms`       | `30`    | Settle wait before release             |
+| `--drag-pixels-per-step` | `20`    | Point density per pixel                |
+| `--drag-min-steps`       | `10`    | Minimum interpolation steps            |
 
-### VNC
+**Scroll timing:** [`Scroll.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/Scroll.swift)
 
-Supports multiple VNC authentication methods:
+| Parameter           | Default | Description                     |
+|---------------------|---------|---------------------------------|
+| `--scroll-press-ms` | `10`    | Scroll press-release gap        |
+| `--scroll-tick-ms`  | `20`    | Delay between ticks             |
 
-- **None** — no authentication
-- **VNC Auth** — password-based challenge-response (DES)
-- **ARD** — Apple Remote Desktop (Diffie-Hellman + AES)
-- **VeNCrypt** — TLS-wrapped auth (Plain, VNC, None subtypes)
+**Keyboard timing:** [`KeyPress.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/KeyPress.swift)
 
-macOS Screen Sharing (ARD) is auto-detected via the `RFB 003.889` version string.
+| Parameter        | Default | Description                  |
+|------------------|---------|------------------------------|
+| `--key-hold-ms`  | `30`    | Key hold duration            |
+| `--combo-mod-ms` | `10`    | Modifier key settle delay    |
 
-### SSH
+**Typing timing:** [`TextInput.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/TextInput.swift)
 
-Supports password and private key authentication. When the target is macOS, the SSH tool enables AppleScript execution (`osascript`), clipboard access (`pbpaste`/`pbcopy`), and system-level control.
+| Parameter             | Default | Description                    |
+|-----------------------|---------|--------------------------------|
+| `--type-key-ms`       | `20`    | Key hold during typing         |
+| `--type-inter-key-ms` | `20`    | Inter-character delay          |
+| `--type-shift-ms`     | `10`    | Shift key settle duration      |
+| `--paste-settle-ms`   | `30`    | Post-clipboard write wait      |
+
+**Image:** [`FrameCapture.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/FrameCapture.swift) · [`CommandHandler.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/CommandHandler.swift)
+
+| Parameter              | Default | Description             |
+|------------------------|---------|-------------------------|
+| `--cursor-crop-radius` | `150`   | Cursor crop radius (px) |
 
 ---
 
-Copyright (c) 2025 Riza Emre ARAS — MIT License
+## Tools
+
+All operations are performed through a single `vnc_command` tool:
+
+### Screen
+
+| Action         | Parameters | Description                                |
+|----------------|------------|--------------------------------------------|
+| `screenshot`   |            | Full screen PNG capture                    |
+| `cursor_crop`  |            | Crop around cursor with crosshair overlay  |
+| `diff_check`   |            | Detect screen changes against baseline     |
+| `set_baseline` |            | Save current screen as diff reference      |
+
+### Mouse
+
+| Action               | Parameters                 | Description                    |
+|----------------------|----------------------------|--------------------------------|
+| `mouse_click`        | `x, y, button?`            | Click (left\|right\|middle)    |
+| `mouse_double_click` | `x, y`                     | Double click                   |
+| `mouse_move`         | `x, y`                     | Move cursor                    |
+| `hover`              | `x, y`                     | Move + settle wait             |
+| `nudge`              | `dx, dy`                   | Relative cursor movement       |
+| `mouse_drag`         | `x, y, toX, toY`           | Drag from start to end         |
+| `scroll`             | `x, y, direction, amount?` | Scroll (up\|down\|left\|right) |
+
+### Keyboard
+
+| Action      | Parameters        | Description                                                  |
+|-------------|-------------------|--------------------------------------------------------------|
+| `key_tap`   | `key`             | Single key press (enter\|escape\|tab\|space\|...)            |
+| `key_combo` | `key` or `keys`   | Modifier combo ("cmd+c" or ["cmd","shift","3"])              |
+| `key_type`  | `text`            | Type text character by character                             |
+| `paste`     | `text`            | Paste text via clipboard                                     |
+
+### Control
+
+| Action     | Parameters | Description                       |
+|------------|------------|-----------------------------------|
+| `wait`     | `ms?`      | Wait (default 500ms)              |
+| `health`   |            | Connection status + display info  |
+| `shutdown` |            | Graceful daemon shutdown          |
+
+---
+
+## Authentication
+
+Supported VNC authentication methods:
+
+- **VNC Auth** — password-based challenge-response (DES)
+- **ARD** — Apple Remote Desktop (Diffie-Hellman + AES-128-ECB)
+
+macOS is auto-detected via the ARD auth type 30 credential request. When detected, Meta keys are remapped to Super (Command key compatibility).
+
+---
+
+Copyright (c) 2026 Riza Emre ARAS — MIT License
