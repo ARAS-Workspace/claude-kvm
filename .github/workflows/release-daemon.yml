@@ -1,8 +1,8 @@
-name: Release VLM Tool
+name: Release Daemon Tool
 
 on:
   push:
-    tags: ['vlm-v*']
+    tags: ['daemon-v*']
 
 permissions:
   contents: write
@@ -19,18 +19,18 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          VERSION="${GITHUB_REF#refs/tags/vlm-v}"
+          VERSION="${GITHUB_REF#refs/tags/daemon-v}"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
             echo "::error::Invalid semver format: $VERSION (expected X.Y or X.Y.Z)"
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "dmg_name=claude-kvm-vlm-${VERSION}-darwin-arm64.dmg" >> "$GITHUB_OUTPUT"
-          echo "tar_name=claude-kvm-vlm-${VERSION}-darwin-arm64.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "dmg_name=claude-kvm-daemon-${VERSION}-darwin-arm64.dmg" >> "$GITHUB_OUTPUT"
+          echo "tar_name=claude-kvm-daemon-${VERSION}-darwin-arm64.tar.gz" >> "$GITHUB_OUTPUT"
 
   build:
     needs: extract-version
-    uses: ./.github/workflows/build-vlm.yml
+    uses: ./.github/workflows/build-daemon.yml
     with:
       version: ${{ needs.extract-version.outputs.version }}
     secrets: inherit
@@ -51,8 +51,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "vlm-v${{ needs.extract-version.outputs.version }}"
-          name: "claude-kvm-vlm ${{ needs.extract-version.outputs.version }}"
+          tag_name: "daemon-v${{ needs.extract-version.outputs.version }}"
+          name: "claude-kvm-daemon ${{ needs.extract-version.outputs.version }}"
           body: ""
           files: |
             ${{ runner.temp }}/release/${{ needs.extract-version.outputs.dmg_name }}

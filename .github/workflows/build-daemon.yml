@@ -1,8 +1,6 @@
-name: Build VLM Tool
+name: Build Daemon Tool
 
 on:
-  pull_request:
-    branches: [vlm-tool]
   workflow_call:
     inputs:
       version:
@@ -21,12 +19,12 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: build-vlm-${{ github.ref }}
+  group: build-daemon-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Build & Sign claude-kvm-vlm (macOS arm64)
+    name: Build & Sign claude-kvm-daemon (macOS arm64)
     runs-on: macos-26
     timeout-minutes: 30
     env:
@@ -76,7 +74,7 @@ jobs:
 
       # ── 3. Install tools ────────────────────────────────────
       - name: Install build dependencies
-        run: brew install xcodegen openssl@3 jpeg-turbo
+        run: brew install xcodegen openssl@3
 
       - name: Install Metal Toolchain
         run: xcodebuild -downloadComponent MetalToolchain
@@ -88,14 +86,14 @@ jobs:
       - name: Resolve Dependencies
         run: |
           xcodebuild -resolvePackageDependencies \
-            -project Claude-KVM-VLM.xcodeproj \
-            -scheme claude-kvm-vlm
+            -project Claude-KVM-Daemon.xcodeproj \
+            -scheme claude-kvm-daemon
 
       - name: Build Release
         run: |
           xcodebuild \
-            -project Claude-KVM-VLM.xcodeproj \
-            -scheme claude-kvm-vlm \
+            -project Claude-KVM-Daemon.xcodeproj \
+            -scheme claude-kvm-daemon \
             -configuration Release \
             ARCHS=arm64 \
             build
@@ -104,20 +102,20 @@ jobs:
       - name: Prepare artifact
         run: |
           BUILD_DIR=$(xcodebuild \
-            -project Claude-KVM-VLM.xcodeproj \
-            -scheme claude-kvm-vlm \
+            -project Claude-KVM-Daemon.xcodeproj \
+            -scheme claude-kvm-daemon \
             -configuration Release \
             -showBuildSettings \
             | grep -m1 'BUILT_PRODUCTS_DIR' \
             | awk '{print $3}')
 
           mkdir -p artifact
-          cp "$BUILD_DIR/claude-kvm-vlm" artifact/
+          cp "$BUILD_DIR/claude-kvm-daemon" artifact/
           cp "$BUILD_DIR/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib" artifact/mlx.metallib
 
           echo "--- Artifact contents ---"
           ls -lh artifact/
-          file artifact/claude-kvm-vlm
+          file artifact/claude-kvm-daemon
 
       # ── 6. Codesign ─────────────────────────────────────────
       - name: Codesign binary
@@ -128,16 +126,16 @@ jobs:
             --entitlements entitlements.plist \
             --timestamp \
             --keychain "$KEYCHAIN_PATH" \
-            artifact/claude-kvm-vlm
+            artifact/claude-kvm-daemon
 
           echo "--- Verify signature ---"
-          codesign -dvv artifact/claude-kvm-vlm
+          codesign -dvv artifact/claude-kvm-daemon
 
       # ── 7. Create tar.gz (signed binary, for Homebrew) ─────
       - name: Create tar.gz
         run: |
           VERSION="${{ inputs.version || '0.0.0' }}"
-          TAR_NAME="claude-kvm-vlm-${VERSION}-darwin-arm64.tar.gz"
+          TAR_NAME="claude-kvm-daemon-${VERSION}-darwin-arm64.tar.gz"
 
           tar -czf "$TAR_NAME" -C artifact .
 
@@ -149,10 +147,10 @@ jobs:
       - name: Create DMG
         run: |
           VERSION="${{ inputs.version || '0.0.0' }}"
-          DMG_NAME="claude-kvm-vlm-${VERSION}-darwin-arm64.dmg"
+          DMG_NAME="claude-kvm-daemon-${VERSION}-darwin-arm64.dmg"
 
           hdiutil create \
-            -volname "claude-kvm-vlm" \
+            -volname "claude-kvm-daemon" \
             -srcfolder artifact \
             -ov -format UDZO \
             "$DMG_NAME"
@@ -179,7 +177,7 @@ jobs:
           xcrun stapler validate "$DMG_NAME"
 
           echo "### Build Complete" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Binary:** claude-kvm-vlm (arm64)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Binary:** claude-kvm-daemon (arm64)" >> "$GITHUB_STEP_SUMMARY"
           echo "- **DMG:** $DMG_NAME" >> "$GITHUB_STEP_SUMMARY"
           echo "- **tar.gz:** $TAR_NAME" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Signed:** Developer ID Application" >> "$GITHUB_STEP_SUMMARY"
