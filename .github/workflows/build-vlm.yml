@@ -75,8 +75,8 @@ jobs:
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
 
       # ── 3. Install tools ────────────────────────────────────
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Install build dependencies
+        run: brew install xcodegen openssl@3 jpeg-turbo
 
       - name: Install Metal Toolchain
         run: xcodebuild -downloadComponent MetalToolchain
