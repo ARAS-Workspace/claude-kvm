@@ -53,10 +53,10 @@ jobs:
           path: artifact/
           retention-days: 90
 
-      - name: Commit prebuilt to vlm-tool-dev
+      - name: Commit prebuilt to daemon-tool-dev
         run: |
-          git fetch origin vlm-tool-dev
-          git checkout vlm-tool-dev
+          git fetch origin daemon-tool-dev
+          git checkout daemon-tool-dev
 
           mkdir -p vendor/libvnc/prebuilt/include/rfb
           cp artifact/libvncclient.a vendor/libvnc/prebuilt/
@@ -75,5 +75,5 @@ jobs:
           Runner: macos-26
           Source: LibVNCServer-${LIBVNC_VERSION}
           TLS: OpenSSL 3.x
-          Compression: zlib + libjpeg-turbo"
-          git push origin vlm-tool-dev
+          Compression: zlib"
+          git push origin daemon-tool-dev
