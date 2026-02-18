@@ -1,8 +1,6 @@
 name: Build Daemon Tool
 
 on:
-  pull_request:
-    branches: [daemon-tool]
   workflow_call:
     inputs:
       version:
