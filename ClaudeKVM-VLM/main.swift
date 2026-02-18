@@ -155,16 +155,25 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
             throw ExitCode.failure
         }
 
+        // 4. Initialize display scaling
+        let scaling = DisplayScaling(
+            nativeWidth: vnc.framebufferWidth,
+            nativeHeight: vnc.framebufferHeight
+        )
+        log("Display: \(scaling.nativeWidth)×\(scaling.nativeHeight) → \(scaling.scaledWidth)×\(scaling.scaledHeight)")
+
         emitEvent(Event(
             type: "ready",
-            detail: "VNC connected, VLM loaded"
+            detail: "VNC connected, VLM loaded",
+            scaledWidth: scaling.scaledWidth,
+            scaledHeight: scaling.scaledHeight
         ))
 
-        // 4. Create input controller
+        // 5. Create input controller
         let input = InputController(vnc: vnc)
 
-        // 5. Enter command loop (stdin NDJSON)
-        await runCommandLoop(vnc: vnc, engine: engine, input: input)
+        // 6. Enter command loop (stdin NDJSON)
+        await runCommandLoop(vnc: vnc, engine: engine, input: input, scaling: scaling)
 
         // 6. Cleanup
         vnc.disconnect()
@@ -173,7 +182,11 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
 
     // MARK: - Command Loop
 
-    private func runCommandLoop(vnc: VNCBridge, engine: VLMEngine, input: InputController) async {
+    // Baseline buffer for diff_check
+    private static var baselineBuffer: Data?
+    private static let diffThreshold: UInt8 = 30
+
+    private func runCommandLoop(vnc: VNCBridge, engine: VLMEngine, input: InputController, scaling: DisplayScaling) async {
         let stdin = FileHandle.standardInput
 
         // Watch for stdin EOF (parent process closed pipe)
@@ -205,7 +218,7 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
 
                 do {
                     let command = try JSONDecoder().decode(Command.self, from: lineData)
-                    await handleCommand(command, vnc: vnc, engine: engine, input: input)
+                    await handleCommand(command, vnc: vnc, engine: engine, input: input, scaling: scaling)
                 } catch {
                     emitEvent(Event(
                         type: "error",
@@ -224,113 +237,187 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
         _ command: Command,
         vnc: VNCBridge,
         engine: VLMEngine,
-        input: InputController
+        input: InputController,
+        scaling: DisplayScaling
     ) async {
         let id = command.id
 
         do {
             switch command.type {
-            case "prompt":
-                await handlePrompt(command, vnc: vnc, engine: engine)
-                return
+
+            // ── Screen ────────────────────────────────────────
 
             case "screenshot":
-                handleScreenshot(command, vnc: vnc)
-                return
+                guard let imageData = vnc.withFramebuffer({ buf, w, h -> Data? in
+                    createPNGFromRGBA(buffer: buf, width: w, height: h)
+                }) ?? nil else {
+                    throw VNCError.sendFailed("No framebuffer")
+                }
+                emitEvent(Event(
+                    id: id, type: "result", success: true,
+                    image: imageData.base64EncodedString(),
+                    scaledWidth: scaling.scaledWidth,
+                    scaledHeight: scaling.scaledHeight
+                ))
+
+            case "cursor_crop":
+                let pos = input.cursorPosition
+                let scaledPos = scaling.toScaled(x: pos.x, y: pos.y)
+                guard let imageData = vnc.withFramebuffer({ buf, w, h -> Data? in
+                    cropWithCrosshair(
+                        buffer: buf, width: w, height: h,
+                        centerX: pos.x, centerY: pos.y, radius: 150
+                    )
+                }) ?? nil else {
+                    throw VNCError.sendFailed("No framebuffer")
+                }
+                emitEvent(Event(
+                    id: id, type: "result", success: true,
+                    image: imageData.base64EncodedString(),
+                    x: scaledPos.x, y: scaledPos.y
+                ))
+
+            case "diff_check":
+                let changed = vnc.withFramebuffer { buf, _, _ -> Bool in
+                    diffCheck(buffer: buf)
+                } ?? false
+                emitEvent(Event(id: id, type: "result", success: true, detail: "changeDetected: \(changed)"))
+
+            case "set_baseline":
+                vnc.withFramebuffer { buf, _, _ -> Void in
+                    Self.baselineBuffer = Data(buf)
+                }
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+
+            // ── Mouse ─────────────────────────────────────────
 
             case "mouse_move":
-                guard let x = command.x, let y = command.y else {
-                    throw VNCError.sendFailed("Missing x/y")
+                let native = nativeXY(command, scaling: scaling)
+                try await input.mouseMove(x: native.x, y: native.y)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+
+            case "hover":
+                let native = nativeXY(command, scaling: scaling)
+                try await input.mouseHover(x: native.x, y: native.y)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+
+            case "nudge":
+                guard let dx = command.dx, let dy = command.dy else {
+                    throw VNCError.sendFailed("Missing dx/dy")
                 }
-                try await input.mouseMove(x: x, y: y)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "moved to \(x),\(y)"))
+                // Scale the delta too
+                let nativeDX = Int((Double(dx) * Double(scaling.nativeWidth) / Double(scaling.scaledWidth)).rounded())
+                let nativeDY = Int((Double(dy) * Double(scaling.nativeHeight) / Double(scaling.scaledHeight)).rounded())
+                try await input.mouseNudge(dx: nativeDX, dy: nativeDY)
+                let pos = scaling.toScaled(x: input.cursorPosition.x, y: input.cursorPosition.y)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK", x: pos.x, y: pos.y))
 
             case "mouse_click":
-                guard let x = command.x, let y = command.y else {
-                    throw VNCError.sendFailed("Missing x/y")
-                }
+                let native = nativeXY(command, scaling: scaling)
                 let btn = parseButton(command.button)
-                try await input.mouseClick(x: x, y: y, button: btn)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "clicked \(command.button ?? "left") at \(x),\(y)"))
+                try await input.mouseClick(x: native.x, y: native.y, button: btn)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
 
             case "mouse_double_click":
-                guard let x = command.x, let y = command.y else {
-                    throw VNCError.sendFailed("Missing x/y")
-                }
-                try await input.mouseDoubleClick(x: x, y: y)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "double-clicked at \(x),\(y)"))
+                let native = nativeXY(command, scaling: scaling)
+                try await input.mouseDoubleClick(x: native.x, y: native.y)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
 
             case "mouse_drag":
-                guard let x = command.x, let y = command.y,
-                      let toX = command.toX, let toY = command.toY else {
-                    throw VNCError.sendFailed("Missing x/y/toX/toY")
+                guard let toX = command.toX, let toY = command.toY else {
+                    throw VNCError.sendFailed("Missing toX/toY")
                 }
-                try await input.mouseDrag(fromX: x, fromY: y, toX: toX, toY: toY)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "dragged \(x),\(y) → \(toX),\(toY)"))
+                let from = nativeXY(command, scaling: scaling)
+                let to = scaling.toNative(x: toX, y: toY)
+                try await input.mouseDrag(fromX: from.x, fromY: from.y, toX: to.x, toY: to.y)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
 
             case "scroll":
-                guard let x = command.x, let y = command.y,
-                      let dirStr = command.direction,
+                let native = nativeXY(command, scaling: scaling)
+                guard let dirStr = command.direction,
                       let dir = ScrollDirection(rawValue: dirStr) else {
-                    throw VNCError.sendFailed("Missing x/y/direction")
+                    throw VNCError.sendFailed("Missing direction")
                 }
-                let amount = command.amount ?? 3
-                try await input.scroll(x: x, y: y, direction: dir, amount: amount)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "scrolled \(dirStr) x\(amount)"))
+                try await input.scroll(x: native.x, y: native.y, direction: dir, amount: command.amount ?? 3)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+
+            // ── Keyboard ──────────────────────────────────────
 
             case "key_tap":
-                guard let keyName = command.key,
-                      let sym = namedKeyToKeysym(keyName) else {
+                guard let keyName = command.key, let sym = namedKeyToKeysym(keyName) else {
                     throw VNCError.sendFailed("Missing or unknown key")
                 }
                 try await input.keyTap(sym)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "tapped \(keyName)"))
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
 
             case "key_combo":
                 if let combo = command.key {
                     try await input.keyCombo(combo)
-                    emitEvent(Event(id: id, type: "result", success: true, detail: "combo \(combo)"))
                 } else if let keys = command.keys {
                     let syms = keys.compactMap { namedKeyToKeysym($0) }
                     guard syms.count == keys.count else {
                         throw VNCError.sendFailed("Unknown key in combo: \(keys)")
                     }
                     try await input.keyCombo(syms)
-                    emitEvent(Event(id: id, type: "result", success: true, detail: "combo \(keys.joined(separator: "+"))"))
                 } else {
                     throw VNCError.sendFailed("Missing key or keys")
                 }
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
 
             case "key_type":
                 guard let text = command.text else {
                     throw VNCError.sendFailed("Missing text")
                 }
                 try await input.typeText(text)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "typed \(text.count) chars"))
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
 
             case "paste":
                 guard let text = command.text else {
                     throw VNCError.sendFailed("Missing text")
                 }
                 try await input.pasteText(text)
-                emitEvent(Event(id: id, type: "result", success: true, detail: "pasted \(text.count) chars"))
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
 
-            case "shutdown":
-                emitEvent(Event(id: id, type: "result", success: true, detail: "Shutting down"))
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    Foundation.exit(0)
-                }
+            // ── VLM ───────────────────────────────────────────
+
+            case "vlm_prompt":
+                await handleVLMPrompt(command, vnc: vnc, engine: engine, scaling: scaling)
                 return
 
+            // ── Control ───────────────────────────────────────
+
+            case "wait":
+                let ms = command.ms ?? 500
+                try await Task.sleep(nanoseconds: UInt64(ms) * 1_000_000)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+
             case "health":
-                emitEvent(Event(id: id, type: "result", success: true, detail: "\(vnc.connectionState)"))
+                emitEvent(Event(
+                    id: id, type: "result", success: true,
+                    detail: "\(vnc.connectionState)",
+                    scaledWidth: scaling.scaledWidth,
+                    scaledHeight: scaling.scaledHeight
+                ))
+
+            case "shutdown":
+                emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { Foundation.exit(0) }
+                return
 
             default:
-                emitEvent(Event(id: id, type: "error", detail: "Unknown command type: \(command.type)"))
+                emitEvent(Event(id: id, type: "error", detail: "Unknown command: \(command.type)"))
             }
         } catch {
             emitEvent(Event(id: id, type: "error", detail: "\(error.localizedDescription)"))
         }
+    }
+
+    // MARK: - Coordinate Helpers
+
+    private func nativeXY(_ command: Command, scaling: DisplayScaling) -> (x: Int, y: Int) {
+        let x = command.x ?? 0
+        let y = command.y ?? 0
+        return scaling.toNative(x: x, y: y)
     }
 
     private func parseButton(_ name: String?) -> MouseButton {
@@ -341,12 +428,13 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
         }
     }
 
-    // MARK: - Prompt Handler
+    // MARK: - VLM Prompt Handler
 
-    private func handlePrompt(
+    private func handleVLMPrompt(
         _ command: Command,
         vnc: VNCBridge,
-        engine: VLMEngine
+        engine: VLMEngine,
+        scaling: DisplayScaling
     ) async {
         guard let payload = command.payload, !payload.isEmpty else {
             emitEvent(Event(id: command.id, type: "error", detail: "Missing payload"))
@@ -355,53 +443,179 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
 
         emitEvent(Event(id: command.id, type: "status", state: "processing"))
 
-        // Capture framebuffer as PNG for VLM
-        guard let imageData = vnc.withFramebuffer({ buffer, width, height -> Data? in
-            createPNGFromRGBA(buffer: buffer, width: width, height: height)
-        }) ?? nil else {
+        // If crop region specified, crop that area; otherwise full screen
+        let imageData: Data?
+        if let sx = command.x, let sy = command.y,
+           let sw = command.width, let sh = command.height {
+            let native = scaling.toNative(x: sx, y: sy)
+            let nw = Int((Double(sw) * Double(scaling.nativeWidth) / Double(scaling.scaledWidth)).rounded())
+            let nh = Int((Double(sh) * Double(scaling.nativeHeight) / Double(scaling.scaledHeight)).rounded())
+            imageData = vnc.withFramebuffer { buf, w, h -> Data? in
+                cropRegionToPNG(buffer: buf, fbWidth: w, fbHeight: h,
+                                x: native.x, y: native.y, width: nw, height: nh)
+            } ?? nil
+        } else {
+            imageData = vnc.withFramebuffer { buf, w, h -> Data? in
+                createPNGFromRGBA(buffer: buf, width: w, height: h)
+            } ?? nil
+        }
+
+        guard let imageData else {
             emitEvent(Event(id: command.id, type: "error", detail: "No framebuffer available"))
             return
         }
 
-        // Run VLM inference
         do {
-            let result = try await engine.generate(
-                imageData: imageData,
-                prompt: payload,
-                maxTokens: 1024
-            )
-            emitEvent(Event(
-                id: command.id,
-                type: "result",
-                success: true,
-                detail: result
-            ))
+            let result = try await engine.generate(imageData: imageData, prompt: payload, maxTokens: 1024)
+            emitEvent(Event(id: command.id, type: "result", success: true, detail: result))
         } catch {
-            emitEvent(Event(
-                id: command.id,
-                type: "error",
-                detail: "VLM inference failed: \(error.localizedDescription)"
-            ))
+            emitEvent(Event(id: command.id, type: "error", detail: "VLM failed: \(error.localizedDescription)"))
         }
     }
 
-    // MARK: - Screenshot Handler
+    // MARK: - Screenshot Handler (kept for internal use)
 
-    private func handleScreenshot(_ command: Command, vnc: VNCBridge) {
-        guard let imageData = vnc.withFramebuffer({ buffer, width, height -> Data? in
-            createPNGFromRGBA(buffer: buffer, width: width, height: height)
+    private func handleScreenshot(_ command: Command, vnc: VNCBridge, scaling: DisplayScaling) {
+        guard let imageData = vnc.withFramebuffer({ buf, w, h -> Data? in
+            createPNGFromRGBA(buffer: buf, width: w, height: h)
         }) ?? nil else {
-            emitEvent(Event(id: command.id, type: "error", detail: "No framebuffer available"))
+            emitEvent(Event(id: command.id, type: "error", detail: "No framebuffer"))
             return
         }
-
-        let base64 = imageData.base64EncodedString()
         emitEvent(Event(
-            id: command.id,
-            type: "result",
-            success: true,
-            image: base64
+            id: command.id, type: "result", success: true,
+            image: imageData.base64EncodedString(),
+            scaledWidth: scaling.scaledWidth,
+            scaledHeight: scaling.scaledHeight
         ))
+    }
+
+    // MARK: - Diff Check
+
+    private func diffCheck(buffer: UnsafeRawBufferPointer) -> Bool {
+        guard let baseline = Self.baselineBuffer else {
+            Self.baselineBuffer = Data(buffer)
+            return false
+        }
+
+        let threshold = Self.diffThreshold
+        let count = min(baseline.count, buffer.count)
+
+        var changed = false
+        baseline.withUnsafeBytes { basePtr in
+            let base = basePtr.bindMemory(to: UInt8.self)
+            let current = buffer.bindMemory(to: UInt8.self)
+            for i in stride(from: 0, to: count, by: 4) {
+                if abs(Int(base[i]) - Int(current[i])) > Int(threshold) ||
+                   abs(Int(base[i+1]) - Int(current[i+1])) > Int(threshold) ||
+                   abs(Int(base[i+2]) - Int(current[i+2])) > Int(threshold) {
+                    changed = true
+                    return
+                }
+            }
+        }
+
+        Self.baselineBuffer = Data(buffer)
+        return changed
+    }
+
+    // MARK: - Cursor Crop with Crosshair
+
+    private func cropWithCrosshair(
+        buffer: UnsafeRawBufferPointer,
+        width: Int, height: Int,
+        centerX: Int, centerY: Int, radius: Int
+    ) -> Data? {
+        let left = max(0, centerX - radius)
+        let top = max(0, centerY - radius)
+        let right = min(width, centerX + radius)
+        let bottom = min(height, centerY + radius)
+        let cropW = right - left
+        let cropH = bottom - top
+        guard cropW > 0, cropH > 0 else { return nil }
+
+        // Extract crop region
+        var cropData = [UInt8](repeating: 0, count: cropW * cropH * 4)
+        let src = buffer.bindMemory(to: UInt8.self)
+        for row in 0..<cropH {
+            let srcOffset = ((top + row) * width + left) * 4
+            let dstOffset = row * cropW * 4
+            let rowBytes = cropW * 4
+            for col in 0..<rowBytes {
+                cropData[dstOffset + col] = src[srcOffset + col]
+            }
+        }
+
+        // Draw red crosshair
+        let cx = centerX - left
+        let cy = centerY - top
+        let crossSize = 12
+        for i in -crossSize...crossSize {
+            // Horizontal
+            let hx = cx + i
+            if hx >= 0, hx < cropW {
+                let off = (cy * cropW + hx) * 4
+                cropData[off] = 255; cropData[off+1] = 0; cropData[off+2] = 0; cropData[off+3] = 255
+            }
+            // Vertical
+            let vy = cy + i
+            if vy >= 0, vy < cropH {
+                let off = (vy * cropW + cx) * 4
+                cropData[off] = 255; cropData[off+1] = 0; cropData[off+2] = 0; cropData[off+3] = 255
+            }
+        }
+
+        // Encode to PNG
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        return cropData.withUnsafeMutableBytes { rawPtr -> Data? in
+            guard let ctx = CGContext(
+                data: rawPtr.baseAddress,
+                width: cropW, height: cropH,
+                bitsPerComponent: 8, bytesPerRow: cropW * 4,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            ), let cgImage = ctx.makeImage() else { return nil }
+            let rep = NSBitmapImageRep(cgImage: cgImage)
+            return rep.representation(using: .png, properties: [:])
+        }
+    }
+
+    // MARK: - Crop Region to PNG
+
+    private func cropRegionToPNG(
+        buffer: UnsafeRawBufferPointer,
+        fbWidth: Int, fbHeight: Int,
+        x: Int, y: Int, width cropW: Int, height cropH: Int
+    ) -> Data? {
+        let clampedX = max(0, min(x, fbWidth))
+        let clampedY = max(0, min(y, fbHeight))
+        let clampedW = min(cropW, fbWidth - clampedX)
+        let clampedH = min(cropH, fbHeight - clampedY)
+        guard clampedW > 0, clampedH > 0 else { return nil }
+
+        var cropData = [UInt8](repeating: 0, count: clampedW * clampedH * 4)
+        let src = buffer.bindMemory(to: UInt8.self)
+        for row in 0..<clampedH {
+            let srcOffset = ((clampedY + row) * fbWidth + clampedX) * 4
+            let dstOffset = row * clampedW * 4
+            let rowBytes = clampedW * 4
+            for col in 0..<rowBytes {
+                cropData[dstOffset + col] = src[srcOffset + col]
+            }
+        }
+
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        return cropData.withUnsafeMutableBytes { rawPtr -> Data? in
+            guard let ctx = CGContext(
+                data: rawPtr.baseAddress,
+                width: clampedW, height: clampedH,
+                bitsPerComponent: 8, bytesPerRow: clampedW * 4,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            ), let cgImage = ctx.makeImage() else { return nil }
+            let rep = NSBitmapImageRep(cgImage: cgImage)
+            return rep.representation(using: .png, properties: [:])
+        }
     }
 
     // MARK: - PNG Encoding
@@ -501,12 +715,17 @@ struct Command: Decodable {
     let y: Int?
     let toX: Int?
     let toY: Int?
+    let dx: Int?
+    let dy: Int?
+    let width: Int?
+    let height: Int?
     let button: String?
     let key: String?
     let keys: [String]?
     let text: String?
     let direction: String?
     let amount: Int?
+    let ms: Int?
 }
 
 struct Event: Encodable {
@@ -516,4 +735,41 @@ struct Event: Encodable {
     var state: String?
     var detail: String?
     var image: String?
+    var x: Int?
+    var y: Int?
+    var scaledWidth: Int?
+    var scaledHeight: Int?
+}
+
+// MARK: - Display Scaling
+
+struct DisplayScaling {
+    let nativeWidth: Int
+    let nativeHeight: Int
+    let scaledWidth: Int
+    let scaledHeight: Int
+
+    init(nativeWidth: Int, nativeHeight: Int, maxDimension: Int = 1280) {
+        self.nativeWidth = nativeWidth
+        self.nativeHeight = nativeHeight
+        let ratio = min(
+            Double(maxDimension) / Double(nativeWidth),
+            Double(maxDimension) / Double(nativeHeight),
+            1.0
+        )
+        self.scaledWidth = Int((Double(nativeWidth) * ratio).rounded())
+        self.scaledHeight = Int((Double(nativeHeight) * ratio).rounded())
+    }
+
+    func toNative(x: Int, y: Int) -> (x: Int, y: Int) {
+        let sx = Double(nativeWidth) / Double(scaledWidth)
+        let sy = Double(nativeHeight) / Double(scaledHeight)
+        return (x: Int((Double(x) * sx).rounded()), y: Int((Double(y) * sy).rounded()))
+    }
+
+    func toScaled(x: Int, y: Int) -> (x: Int, y: Int) {
+        let sx = Double(scaledWidth) / Double(nativeWidth)
+        let sy = Double(scaledHeight) / Double(nativeHeight)
+        return (x: Int((Double(x) * sx).rounded()), y: Int((Double(y) * sy).rounded()))
+    }
 }

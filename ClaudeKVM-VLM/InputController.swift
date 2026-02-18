@@ -71,6 +71,24 @@ final class InputController {
         cursorY = y
     }
 
+    // MARK: - Mouse Hover (move + wait)
+
+    func mouseHover(x: Int, y: Int) async throws {
+        try await mouseMove(x: x, y: y)
+        usleep(400_000) // 400ms settle
+    }
+
+    // MARK: - Mouse Nudge (relative)
+
+    func mouseNudge(dx: Int, dy: Int) async throws {
+        let newX = max(0, cursorX + dx)
+        let newY = max(0, cursorY + dy)
+        try await mouseMove(x: newX, y: newY)
+    }
+
+    /// Current cursor position
+    var cursorPosition: (x: Int, y: Int) { (cursorX, cursorY) }
+
     // MARK: - Mouse Click
 
     func mouseClick(x: Int, y: Int, button: MouseButton = .left) async throws {

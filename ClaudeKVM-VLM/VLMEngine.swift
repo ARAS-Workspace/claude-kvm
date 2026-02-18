@@ -20,7 +20,7 @@ import MLXLMCommon
 
 /// Wrapper around MLX VLM for model loading and inference.
 final class VLMEngine {
-    static let modelId = "mlx-community/Qwen2.5-VL-3B-Instruct-4bit"
+    static let modelId = "mlx-community/FastVLM-0.5B-bf16"
 
     var verbose = false
 
