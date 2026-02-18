@@ -112,7 +112,7 @@ enum KeySym {
 // MARK: - Named Key → KeySym Resolution
 
 func namedKeyToKeysym(_ name: String) -> UInt32? {
-    switch name {
+    switch name.lowercased() {
     case "shift", "lshift":      return KeySym.shiftLeft
     case "rshift":               return KeySym.shiftRight
     case "ctrl", "control":      return KeySym.ctrlLeft
