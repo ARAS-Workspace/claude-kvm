@@ -1,6 +1,6 @@
-name: Claude-KVM-VLM
+name: Claude-KVM-Daemon
 options:
-  bundleIdPrefix: com.remrearas.claude-kvm-vlm
+  bundleIdPrefix: com.remrearas.claude-kvm-daemon
   deploymentTarget:
     macOS: "14.0"
   xcodeVersion: "16.0"
@@ -14,11 +14,11 @@ packages:
     from: "1.3.0"
 
 targets:
-  claude-kvm-vlm:
+  claude-kvm-daemon:
     type: tool
     platform: macOS
     sources:
-      - ClaudeKVM-VLM
+      - ClaudeKVM-Daemon
     dependencies:
       - package: mlx-swift-lm
         product: MLXVLM

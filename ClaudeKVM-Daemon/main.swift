@@ -4,10 +4,10 @@ import CoreGraphics
 import AppKit
 
 @main
-struct ClaudeKVMVLM: AsyncParsableCommand {
+struct ClaudeKVMDaemon: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "claude-kvm-vlm",
-        abstract: "VLM-powered VNC operator daemon for Claude KVM (Apple Silicon)",
+        commandName: "claude-kvm-daemon",
+        abstract: "Native VNC operator daemon for Claude KVM (Apple Silicon)",
         discussion: """
              █████╗ ██████╗  █████╗ ███████╗
             ██╔══██╗██╔══██╗██╔══██╗██╔════╝
@@ -29,14 +29,14 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
 
             EXAMPLES:
               Download model:
-                claude-kvm-vlm --download-model
+                claude-kvm-daemon --download-model
 
               Start daemon:
-                claude-kvm-vlm --host 192.168.1.100 --port 5900 --password secret
+                claude-kvm-daemon --host 192.168.1.100 --port 5900 --password secret
 
               Multiple instances:
-                claude-kvm-vlm --host 10.0.0.1 --port 5900 &
-                claude-kvm-vlm --host 10.0.0.2 --port 5900 &
+                claude-kvm-daemon --host 10.0.0.1 --port 5900 &
+                claude-kvm-daemon --host 10.0.0.2 --port 5900 &
 
             PROTOCOL (stdin/stdout NDJSON):
               stdin  {"id":"c1","type":"prompt","payload":"Click Safari icon"}
@@ -115,7 +115,7 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
 
         guard engine.isModelCached else {
             printError(
-                "Model not downloaded. Run: claude-kvm-vlm --download-model"
+                "Model not downloaded. Run: claude-kvm-daemon --download-model"
             )
             throw ExitCode.failure
         }
