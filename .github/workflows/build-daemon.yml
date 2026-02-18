@@ -76,9 +76,6 @@ jobs:
       - name: Install build dependencies
         run: brew install xcodegen openssl@3
 
-      - name: Install Metal Toolchain
-        run: xcodebuild -downloadComponent MetalToolchain
-
       # ── 4. Build ────────────────────────────────────────────
       - name: Generate Xcode Project
         run: xcodegen generate
@@ -111,7 +108,6 @@ jobs:
 
           mkdir -p artifact
           cp "$BUILD_DIR/claude-kvm-daemon" artifact/
-          cp "$BUILD_DIR/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib" artifact/mlx.metallib
 
           echo "--- Artifact contents ---"
           ls -lh artifact/
