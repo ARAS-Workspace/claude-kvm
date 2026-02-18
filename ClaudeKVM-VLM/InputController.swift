@@ -263,41 +263,41 @@ enum ScrollDirection: String {
 // MARK: - Key Symbol Constants
 
 enum KeySym {
-    static let shiftLeft:  UInt32 = 0xFFE1
+    static let shiftLeft: UInt32 = 0xFFE1
     static let shiftRight: UInt32 = 0xFFE2
-    static let ctrlLeft:   UInt32 = 0xFFE3
-    static let ctrlRight:  UInt32 = 0xFFE4
-    static let altLeft:    UInt32 = 0xFFE9
-    static let altRight:   UInt32 = 0xFFEA
-    static let metaLeft:   UInt32 = 0xFFE7  // Cmd on macOS
-    static let metaRight:  UInt32 = 0xFFE8
-    static let superLeft:  UInt32 = 0xFFEB
-    static let tab:        UInt32 = 0xFF09
-    static let returnKey:  UInt32 = 0xFF0D
-    static let escape:     UInt32 = 0xFF1B
-    static let backspace:  UInt32 = 0xFF08
-    static let delete:     UInt32 = 0xFFFF
-    static let home:       UInt32 = 0xFF50
-    static let end:        UInt32 = 0xFF57
-    static let pageUp:     UInt32 = 0xFF55
-    static let pageDown:   UInt32 = 0xFF56
-    static let arrowLeft:  UInt32 = 0xFF51
-    static let arrowUp:    UInt32 = 0xFF52
+    static let ctrlLeft: UInt32 = 0xFFE3
+    static let ctrlRight: UInt32 = 0xFFE4
+    static let altLeft: UInt32 = 0xFFE9
+    static let altRight: UInt32 = 0xFFEA
+    static let metaLeft: UInt32 = 0xFFE7
+    static let metaRight: UInt32 = 0xFFE8
+    static let superLeft: UInt32 = 0xFFEB
+    static let tab: UInt32 = 0xFF09
+    static let returnKey: UInt32 = 0xFF0D
+    static let escape: UInt32 = 0xFF1B
+    static let backspace: UInt32 = 0xFF08
+    static let delete: UInt32 = 0xFFFF
+    static let home: UInt32 = 0xFF50
+    static let end: UInt32 = 0xFF57
+    static let pageUp: UInt32 = 0xFF55
+    static let pageDown: UInt32 = 0xFF56
+    static let arrowLeft: UInt32 = 0xFF51
+    static let arrowUp: UInt32 = 0xFF52
     static let arrowRight: UInt32 = 0xFF53
-    static let arrowDown:  UInt32 = 0xFF54
-    static let space:      UInt32 = 0x0020
-    static let f1:         UInt32 = 0xFFBE
-    static let f2:         UInt32 = 0xFFBF
-    static let f3:         UInt32 = 0xFFC0
-    static let f4:         UInt32 = 0xFFC1
-    static let f5:         UInt32 = 0xFFC2
-    static let f6:         UInt32 = 0xFFC3
-    static let f7:         UInt32 = 0xFFC4
-    static let f8:         UInt32 = 0xFFC5
-    static let f9:         UInt32 = 0xFFC6
-    static let f10:        UInt32 = 0xFFC7
-    static let f11:        UInt32 = 0xFFC8
-    static let f12:        UInt32 = 0xFFC9
+    static let arrowDown: UInt32 = 0xFF54
+    static let space: UInt32 = 0x0020
+    static let f1: UInt32 = 0xFFBE
+    static let f2: UInt32 = 0xFFBF
+    static let f3: UInt32 = 0xFFC0
+    static let f4: UInt32 = 0xFFC1
+    static let f5: UInt32 = 0xFFC2
+    static let f6: UInt32 = 0xFFC3
+    static let f7: UInt32 = 0xFFC4
+    static let f8: UInt32 = 0xFFC5
+    static let f9: UInt32 = 0xFFC6
+    static let f10: UInt32 = 0xFFC7
+    static let f11: UInt32 = 0xFFC8
+    static let f12: UInt32 = 0xFFC9
 }
 
 // MARK: - Named Key → KeySym Resolution

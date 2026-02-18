@@ -284,7 +284,7 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
                 emitEvent(Event(id: id, type: "result", success: true, detail: "changeDetected: \(changed)"))
 
             case "set_baseline":
-                vnc.withFramebuffer { buf, _, _ -> Void in
+                vnc.withFramebuffer { buf, _, _ in
                     Self.baselineBuffer = Data(buf)
                 }
                 emitEvent(Event(id: id, type: "result", success: true, detail: "OK"))

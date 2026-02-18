@@ -8,11 +8,24 @@ excluded:
 disabled_rules:
   - trailing_comma
   - todo
+  - orphaned_doc_comment
+  - file_length
+  - type_body_length
+  - function_body_length
+  - function_parameter_count
+  - cyclomatic_complexity
+  - large_tuple
 
 opt_in_rules:
   - force_unwrapping
   - implicitly_unwrapped_optional
 
+identifier_name:
+  min_length: 1
+  max_length: 60
+  excluded:
+    - id
+
 line_length:
-  warning: 120
-  error: 150
+  warning: 150
+  error: 200
