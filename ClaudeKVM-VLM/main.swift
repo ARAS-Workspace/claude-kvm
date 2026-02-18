@@ -59,6 +59,9 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
     @Option(name: .long, help: "VNC server port.")
     var port: Int = 5900
 
+    @Option(name: .long, help: "VNC username (required for macOS ARD auth).")
+    var username: String?
+
     @Option(name: .long, help: "VNC server password.")
     var password: String?
 
@@ -131,6 +134,7 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
         let vncConfig = VNCConfiguration(
             host: host,
             port: port,
+            username: username,
             password: password
         )
         let vnc = VNCBridge(config: vncConfig)
@@ -156,17 +160,20 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
             detail: "VNC connected, VLM loaded"
         ))
 
-        // 4. Enter command loop (stdin NDJSON)
-        await runCommandLoop(vnc: vnc, engine: engine)
+        // 4. Create input controller
+        let input = InputController(vnc: vnc)
 
-        // 5. Cleanup
+        // 5. Enter command loop (stdin NDJSON)
+        await runCommandLoop(vnc: vnc, engine: engine, input: input)
+
+        // 6. Cleanup
         vnc.disconnect()
         log("Daemon stopped")
     }
 
     // MARK: - Command Loop
 
-    private func runCommandLoop(vnc: VNCBridge, engine: VLMEngine) async {
+    private func runCommandLoop(vnc: VNCBridge, engine: VLMEngine, input: InputController) async {
         let stdin = FileHandle.standardInput
 
         // Watch for stdin EOF (parent process closed pipe)
@@ -198,7 +205,7 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
 
                 do {
                     let command = try JSONDecoder().decode(Command.self, from: lineData)
-                    await handleCommand(command, vnc: vnc, engine: engine)
+                    await handleCommand(command, vnc: vnc, engine: engine, input: input)
                 } catch {
                     emitEvent(Event(
                         type: "error",
@@ -216,36 +223,121 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
     private func handleCommand(
         _ command: Command,
         vnc: VNCBridge,
-        engine: VLMEngine
+        engine: VLMEngine,
+        input: InputController
     ) async {
-        switch command.type {
-        case "prompt":
-            await handlePrompt(command, vnc: vnc, engine: engine)
+        let id = command.id
 
-        case "screenshot":
-            handleScreenshot(command, vnc: vnc)
+        do {
+            switch command.type {
+            case "prompt":
+                await handlePrompt(command, vnc: vnc, engine: engine)
+                return
 
-        case "shutdown":
-            emitEvent(Event(id: command.id, type: "result", success: true, detail: "Shutting down"))
-            // Force exit after response is flushed
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                Foundation.exit(0)
+            case "screenshot":
+                handleScreenshot(command, vnc: vnc)
+                return
+
+            case "mouse_move":
+                guard let x = command.x, let y = command.y else {
+                    throw VNCError.sendFailed("Missing x/y")
+                }
+                try await input.mouseMove(x: x, y: y)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "moved to \(x),\(y)"))
+
+            case "mouse_click":
+                guard let x = command.x, let y = command.y else {
+                    throw VNCError.sendFailed("Missing x/y")
+                }
+                let btn = parseButton(command.button)
+                try await input.mouseClick(x: x, y: y, button: btn)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "clicked \(command.button ?? "left") at \(x),\(y)"))
+
+            case "mouse_double_click":
+                guard let x = command.x, let y = command.y else {
+                    throw VNCError.sendFailed("Missing x/y")
+                }
+                try await input.mouseDoubleClick(x: x, y: y)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "double-clicked at \(x),\(y)"))
+
+            case "mouse_drag":
+                guard let x = command.x, let y = command.y,
+                      let toX = command.toX, let toY = command.toY else {
+                    throw VNCError.sendFailed("Missing x/y/toX/toY")
+                }
+                try await input.mouseDrag(fromX: x, fromY: y, toX: toX, toY: toY)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "dragged \(x),\(y) → \(toX),\(toY)"))
+
+            case "scroll":
+                guard let x = command.x, let y = command.y,
+                      let dirStr = command.direction,
+                      let dir = ScrollDirection(rawValue: dirStr) else {
+                    throw VNCError.sendFailed("Missing x/y/direction")
+                }
+                let amount = command.amount ?? 3
+                try await input.scroll(x: x, y: y, direction: dir, amount: amount)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "scrolled \(dirStr) x\(amount)"))
+
+            case "key_tap":
+                guard let keyName = command.key,
+                      let sym = namedKeyToKeysym(keyName) else {
+                    throw VNCError.sendFailed("Missing or unknown key")
+                }
+                try await input.keyTap(sym)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "tapped \(keyName)"))
+
+            case "key_combo":
+                if let combo = command.key {
+                    try await input.keyCombo(combo)
+                    emitEvent(Event(id: id, type: "result", success: true, detail: "combo \(combo)"))
+                } else if let keys = command.keys {
+                    let syms = keys.compactMap { namedKeyToKeysym($0) }
+                    guard syms.count == keys.count else {
+                        throw VNCError.sendFailed("Unknown key in combo: \(keys)")
+                    }
+                    try await input.keyCombo(syms)
+                    emitEvent(Event(id: id, type: "result", success: true, detail: "combo \(keys.joined(separator: "+"))"))
+                } else {
+                    throw VNCError.sendFailed("Missing key or keys")
+                }
+
+            case "key_type":
+                guard let text = command.text else {
+                    throw VNCError.sendFailed("Missing text")
+                }
+                try await input.typeText(text)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "typed \(text.count) chars"))
+
+            case "paste":
+                guard let text = command.text else {
+                    throw VNCError.sendFailed("Missing text")
+                }
+                try await input.pasteText(text)
+                emitEvent(Event(id: id, type: "result", success: true, detail: "pasted \(text.count) chars"))
+
+            case "shutdown":
+                emitEvent(Event(id: id, type: "result", success: true, detail: "Shutting down"))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    Foundation.exit(0)
+                }
+                return
+
+            case "health":
+                emitEvent(Event(id: id, type: "result", success: true, detail: "\(vnc.connectionState)"))
+
+            default:
+                emitEvent(Event(id: id, type: "error", detail: "Unknown command type: \(command.type)"))
             }
+        } catch {
+            emitEvent(Event(id: id, type: "error", detail: "\(error.localizedDescription)"))
+        }
+    }
 
-        case "health":
-            emitEvent(Event(
-                id: command.id,
-                type: "result",
-                success: true,
-                detail: "\(vnc.connectionState)"
-            ))
-
-        default:
-            emitEvent(Event(
-                id: command.id,
-                type: "error",
-                detail: "Unknown command type: \(command.type)"
-            ))
+    private func parseButton(_ name: String?) -> MouseButton {
+        switch name?.lowercased() {
+        case "right":  return .right
+        case "middle": return .middle
+        default:       return .left
         }
     }
 
@@ -314,6 +406,8 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
 
     // MARK: - PNG Encoding
 
+    private static let maxImageDimension = 1280
+
     private func createPNGFromRGBA(
         buffer: UnsafeRawBufferPointer,
         width: Int,
@@ -336,7 +430,34 @@ struct ClaudeKVMVLM: AsyncParsableCommand {
             return nil
         }
 
-        let rep = NSBitmapImageRep(cgImage: cgImage)
+        // Scale down if larger than maxImageDimension
+        let maxDim = Self.maxImageDimension
+        let finalImage: CGImage
+        if width > maxDim || height > maxDim {
+            let scale = Double(maxDim) / Double(max(width, height))
+            let newW = Int(Double(width) * scale)
+            let newH = Int(Double(height) * scale)
+
+            guard let scaleCtx = CGContext(
+                data: nil,
+                width: newW,
+                height: newH,
+                bitsPerComponent: 8,
+                bytesPerRow: newW * 4,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            ) else { return nil }
+
+            scaleCtx.interpolationQuality = .high
+            scaleCtx.draw(cgImage, in: CGRect(x: 0, y: 0, width: newW, height: newH))
+
+            guard let scaled = scaleCtx.makeImage() else { return nil }
+            finalImage = scaled
+        } else {
+            finalImage = cgImage
+        }
+
+        let rep = NSBitmapImageRep(cgImage: finalImage)
         return rep.representation(using: .png, properties: [:])
     }
 
@@ -376,6 +497,16 @@ struct Command: Decodable {
     let id: String?
     let type: String
     let payload: String?
+    let x: Int?
+    let y: Int?
+    let toX: Int?
+    let toY: Int?
+    let button: String?
+    let key: String?
+    let keys: [String]?
+    let text: String?
+    let direction: String?
+    let amount: Int?
 }
 
 struct Event: Encodable {

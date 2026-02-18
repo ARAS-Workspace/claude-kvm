@@ -66,6 +66,7 @@ enum VNCError: LocalizedError {
 struct VNCConfiguration {
     var host: String = "127.0.0.1"
     var port: Int = 5900
+    var username: String?
     var password: String?
     var bitsPerSample: Int32 = 8
     var samplesPerPixel: Int32 = 3
@@ -97,7 +98,7 @@ final class VNCBridge: @unchecked Sendable {
     private let isRunning = OSAllocatedUnfairLock(initialState: false)
     private var messageLoopTask: Task<Void, Never>?
     private let messageQueue = DispatchQueue(label: "vnc.message-loop", qos: .userInteractive)
-    fileprivate let config: VNCConfiguration
+    let config: VNCConfiguration
     private var reconnectCount = 0
     fileprivate var framebufferUpdateContinuation: AsyncStream<Void>.Continuation?
     private var stateStreamContinuation: AsyncStream<VNCConnectionState>.Continuation?
@@ -144,6 +145,7 @@ final class VNCBridge: @unchecked Sendable {
         newClient.pointee.GotFrameBufferUpdate = vncGotFrameBufferUpdate
         newClient.pointee.FinishedFrameBufferUpdate = vncFinishedFrameBufferUpdate
         newClient.pointee.GetPassword = vncGetPassword
+        newClient.pointee.GetCredential = vncGetCredential
         newClient.pointee.GotXCutText = vncGotXCutText
 
         // 5. Connect (TCP + RFB handshake)
@@ -448,10 +450,10 @@ final class VNCBridge: @unchecked Sendable {
 
 /// Tag for rfbClientSetClientData/rfbClientGetClientData.
 /// The address of this variable is the key — the value is irrelevant.
-private var vncBridgeTag: UInt8 = 0
+var vncBridgeTag: UInt8 = 0
 
 /// Retrieve the VNCBridge instance from a C rfbClient pointer.
-private func bridge(from client: UnsafeMutablePointer<rfbClient>?) -> VNCBridge? {
+func bridge(from client: UnsafeMutablePointer<rfbClient>?) -> VNCBridge? {
     guard let client else { return nil }
     guard let ptr = rfbClientGetClientData(client, &vncBridgeTag) else { return nil }
     return Unmanaged<VNCBridge>.fromOpaque(ptr).takeUnretainedValue()
