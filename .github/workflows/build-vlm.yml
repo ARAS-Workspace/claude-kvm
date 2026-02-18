@@ -125,6 +125,7 @@ jobs:
           codesign --force \
             --sign "Developer ID Application" \
             --options runtime \
+            --entitlements entitlements.plist \
             --timestamp \
             --keychain "$KEYCHAIN_PATH" \
             artifact/claude-kvm-vlm
