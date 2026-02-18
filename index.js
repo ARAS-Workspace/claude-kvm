@@ -18,7 +18,6 @@
  */
 
 import { spawn } from 'node:child_process';
-import { createInterface } from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -45,8 +44,7 @@ function log(msg) {
 
 let daemon = null;
 let daemonReady = false;
-let scaledWidth = 1280;
-let scaledHeight = 800;
+const display = { width: 1280, height: 800 };
 const pendingRequests = new Map(); // id → { resolve, reject, timer }
 let lineBuffer = '';
 
@@ -87,7 +85,7 @@ function spawnDaemon() {
     daemonReady = false;
     daemon = null;
     // Reject all pending requests
-    for (const [id, req] of pendingRequests) {
+    for (const [, req] of pendingRequests) {
       clearTimeout(req.timer);
       req.reject(new Error('Daemon exited'));
     }
@@ -111,9 +109,9 @@ function handleDaemonEvent(line) {
   // Handle ready event
   if (event.type === 'ready') {
     daemonReady = true;
-    if (event.scaledWidth) scaledWidth = event.scaledWidth;
-    if (event.scaledHeight) scaledHeight = event.scaledHeight;
-    log(`Daemon ready — display ${scaledWidth}×${scaledHeight}`);
+    if (event.display.width) display.width = event.display.width;
+    if (event.display.height) display.height = event.display.height;
+    log(`Daemon ready — display ${display.width}×${display.height}`);
     return;
   }
 
@@ -136,7 +134,6 @@ function handleDaemonEvent(line) {
     }
 
     req.resolve(event);
-    return;
   }
 }
 
@@ -255,7 +252,7 @@ async function main() {
   }
 
   // Register vnc_command tool
-  const vncTool = vncCommandTool(scaledWidth, scaledHeight);
+  const vncTool = vncCommandTool(display.width, display.height);
   mcpServer.tool(
     vncTool.name,
     vncTool.inputSchema,
