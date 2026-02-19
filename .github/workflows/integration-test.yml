@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 # Claude KVM — Integration Test
 #
-# macOS runner + Screen Sharing (ARD) + Homebrew daemon.
-# Claude controls the runner's macOS desktop via VNC agentic loop.
+# macOS runner + Docker (setup-docker-action) + VNC desktop container + Homebrew daemon.
+# Claude controls a remote LXDE desktop via VNC agentic loop.
 
 name: Integration Test
 
@@ -49,16 +49,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Setup Docker
+        uses: docker/setup-docker-action@v4
+
+      - name: Start VNC desktop container
+        run: |
+          docker run -d \
+            --name desktop \
+            -p 5900:5900 \
+            -e RESOLUTION=1280x800 \
+            -e VNC_PASSWORD=testpass \
+            --shm-size=512m \
+            dorowu/ubuntu-desktop-lxde-vnc
+
       - name: Install daemon
         run: brew install ARAS-Workspace/tap/claude-kvm-daemon
 
-      - name: Enable Screen Sharing (VNC)
+      - name: Wait for VNC
         run: |
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-            -activate -configure -access -on -privs -all -restart -agent -allowAccessFor -allUsers \
-            -clientopts -setvnclegacy -vnclegacy yes -clientopts -setvncpw -vncpw testpass
-          sleep 3
-          nc -z localhost 5900 && echo "VNC ready" || { echo "VNC not available"; exit 1; }
+          for i in $(seq 1 60); do
+            nc -z localhost 5900 && echo "VNC ready" && exit 0
+            sleep 1
+          done
+          echo "VNC timeout" && exit 1
 
       - name: Run integration test
         env:
@@ -81,3 +94,9 @@ jobs:
           name: screenshots
           path: test-screenshots/
           if-no-files-found: ignore
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop desktop || true
+          docker rm desktop || true
