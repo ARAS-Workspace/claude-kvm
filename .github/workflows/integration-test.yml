@@ -1,0 +1,180 @@
+# SPDX-License-Identifier: MIT
+# Claude KVM — Integration Test
+#
+# Two jobs:
+#   1. linux-test: Ubuntu runner + Docker VNC desktop (native service)
+#   2. mac-test:   macOS runner + colima/Docker VNC desktop + Homebrew daemon
+#
+# Both run the same agentic test: Claude controls a remote LXDE desktop via VNC.
+
+name: Integration Test
+
+on:
+  push:
+    tags:
+      - 'test-v*'
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'Claude model to use'
+        required: false
+        default: 'claude-sonnet-4-5-20250929'
+        type: choice
+        options:
+          - claude-sonnet-4-5-20250929
+          - claude-opus-4-6
+          - claude-haiku-4-5-20251001
+      max_turns:
+        description: 'Maximum agentic turns'
+        required: false
+        default: '30'
+        type: string
+      jobs:
+        description: 'Which jobs to run'
+        required: false
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - linux-only
+          - mac-only
+
+env:
+  TZ: Europe/Istanbul
+  VNC_IMAGE: dorowu/ubuntu-desktop-lxde-vnc
+
+# ─────────────────────────────────────────────────────────────
+
+jobs:
+
+  # ── Linux Integration Test ─────────────────────────────────
+
+  linux-test:
+    if: ${{ inputs.jobs != 'mac-only' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      desktop:
+        image: dorowu/ubuntu-desktop-lxde-vnc
+        env:
+          RESOLUTION: 1280x800
+          VNC_PASSWORD: testpass
+        ports:
+          - 5900:5900
+        options: --shm-size=512m
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for VNC
+        run: |
+          for i in $(seq 1 30); do
+            nc -z localhost 5900 && echo "VNC ready" && exit 0
+            sleep 1
+          done
+          echo "VNC timeout" && exit 1
+
+      - name: Run integration test
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VNC_HOST: 127.0.0.1
+          VNC_PORT: '5900'
+          VNC_PASSWORD: testpass
+          SCREENSHOTS_DIR: ./test-screenshots
+          MODEL: ${{ inputs.model || 'claude-sonnet-4-5-20250929' }}
+          MAX_TURNS: ${{ inputs.max_turns || '30' }}
+        run: |
+          mkdir -p test-screenshots
+          node test/integration.js
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-linux
+          path: test-screenshots/
+          if-no-files-found: ignore
+
+  # ── macOS Integration Test ─────────────────────────────────
+
+  mac-test:
+    if: ${{ inputs.jobs != 'linux-only' }}
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Docker (colima)
+        run: |
+          brew install colima docker
+          colima start --cpu 2 --memory 4 --disk 10
+
+      - name: Start VNC desktop container
+        run: |
+          docker run -d \
+            --name desktop \
+            -p 5900:5900 \
+            -e RESOLUTION=1280x800 \
+            -e VNC_PASSWORD=testpass \
+            --shm-size=512m \
+            dorowu/ubuntu-desktop-lxde-vnc
+
+      - name: Install daemon
+        run: brew install ARAS-Workspace/tap/claude-kvm-daemon
+
+      - name: Wait for VNC
+        run: |
+          for i in $(seq 1 60); do
+            nc -z localhost 5900 && echo "VNC ready" && exit 0
+            sleep 1
+          done
+          echo "VNC timeout" && exit 1
+
+      - name: Run integration test
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VNC_HOST: 127.0.0.1
+          VNC_PORT: '5900'
+          VNC_PASSWORD: testpass
+          CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
+          SCREENSHOTS_DIR: ./test-screenshots
+          MODEL: ${{ inputs.model || 'claude-sonnet-4-5-20250929' }}
+          MAX_TURNS: ${{ inputs.max_turns || '30' }}
+        run: |
+          mkdir -p test-screenshots
+          node test/integration.js
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-mac
+          path: test-screenshots/
+          if-no-files-found: ignore
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop desktop || true
+          docker rm desktop || true
+          colima stop || true
