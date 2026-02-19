@@ -1,4 +1,4 @@
-# Quick test: Enable ARD on macOS runner and connect via daemon
+# Quick test: Create VNC user, enable ARD, connect via daemon
 
 name: ARD Connection Test
 
@@ -11,16 +11,23 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Set runner password
+      - name: Create VNC user
         run: |
-          sudo dscl . -create /Users/runner Password ""
-          sudo dscl . -passwd /Users/runner "" testpass
+          sudo dscl . -create /Users/vncuser
+          sudo dscl . -create /Users/vncuser UserShell /bin/bash
+          sudo dscl . -create /Users/vncuser RealName "VNC User"
+          sudo dscl . -create /Users/vncuser UniqueID "1099"
+          sudo dscl . -create /Users/vncuser PrimaryGroupID 20
+          sudo dscl . -create /Users/vncuser NFSHomeDirectory /Users/vncuser
+          sudo dscl . -passwd /Users/vncuser testpass
+          sudo dscl . -append /Groups/admin GroupMembership vncuser
+          sudo createhomedir -c -u vncuser
 
-      - name: Enable ARD
+      - name: Enable ARD for vncuser
         run: |
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on -privs -all -restart -agent \
-            -allowAccessFor -specifiedUsers -users runner
+            -allowAccessFor -specifiedUsers -users vncuser
           sleep 3
           nc -z localhost 5900 && echo "VNC port open" || { echo "VNC port closed"; exit 1; }
 
@@ -30,4 +37,4 @@ jobs:
       - name: Test daemon connection
         run: |
           echo '{"method":"health","id":1}' | timeout 15 claude-kvm-daemon \
-            --host 127.0.0.1 --port 5900 --username runner --password testpass
+            --host 127.0.0.1 --port 5900 --username vncuser --password testpass
