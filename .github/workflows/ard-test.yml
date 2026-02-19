@@ -1,0 +1,31 @@
+# Quick test: Enable ARD on macOS runner and connect via daemon
+
+name: ARD Connection Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ard-test:
+    runs-on: macos-26
+    timeout-minutes: 10
+
+    steps:
+      - name: Set runner password
+        run: sudo dscl . -passwd /Users/runner "" testpass
+
+      - name: Enable ARD
+        run: |
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure -access -on -privs -all -restart -agent \
+            -allowAccessFor -specifiedUsers -users runner
+          sleep 3
+          nc -z localhost 5900 && echo "VNC port open" || { echo "VNC port closed"; exit 1; }
+
+      - name: Install daemon
+        run: brew install ARAS-Workspace/tap/claude-kvm-daemon
+
+      - name: Test daemon connection
+        run: |
+          echo '{"method":"health","id":1}' | timeout 15 claude-kvm-daemon \
+            --host 127.0.0.1 --port 5900 --username runner --password testpass
