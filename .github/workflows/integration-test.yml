@@ -55,7 +55,8 @@ jobs:
       - name: Enable Screen Sharing (VNC)
         run: |
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-            -activate -configure -access -on -privs -all -restart -agent -allowAccessFor -allUsers
+            -activate -configure -access -on -privs -all -restart -agent -allowAccessFor -allUsers \
+            -clientopts -setvnclegacy -vnclegacy yes -clientopts -setvncpw -vncpw testpass
           sleep 3
           nc -z localhost 5900 && echo "VNC ready" || { echo "VNC not available"; exit 1; }
 
@@ -64,8 +65,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           VNC_HOST: 127.0.0.1
           VNC_PORT: '5900'
-          VNC_USERNAME: runner
-          VNC_PASSWORD: ''
+          VNC_PASSWORD: testpass
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
           SCREENSHOTS_DIR: ./test-screenshots
           MODEL: ${{ inputs.model || 'claude-sonnet-4-5-20250929' }}
