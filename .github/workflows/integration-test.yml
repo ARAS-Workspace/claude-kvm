@@ -1,0 +1,112 @@
+# SPDX-License-Identifier: MIT
+# Claude KVM — Integration Test
+#
+# macOS runner + Docker Desktop + VNC desktop container + Homebrew daemon.
+# Claude controls a remote LXDE desktop via VNC agentic loop.
+
+name: Integration Test
+
+on:
+  push:
+    tags:
+      - 'test-v*'
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'Claude model to use'
+        required: false
+        default: 'claude-sonnet-4-5-20250929'
+        type: choice
+        options:
+          - claude-sonnet-4-5-20250929
+          - claude-opus-4-6
+          - claude-haiku-4-5-20251001
+      max_turns:
+        description: 'Maximum agentic turns'
+        required: false
+        default: '30'
+        type: string
+
+env:
+  TZ: Europe/Istanbul
+
+# ─────────────────────────────────────────────────────────────
+
+jobs:
+  integration-test:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Docker Desktop
+        run: |
+          curl -L -o Docker.dmg "https://desktop.docker.com/mac/main/arm64/Docker.dmg"
+          sudo hdiutil attach Docker.dmg
+          sudo /Volumes/Docker/Docker.app/Contents/MacOS/install
+          sudo hdiutil detach /Volumes/Docker
+          open /Applications/Docker.app
+          for i in $(seq 1 60); do
+            docker info >/dev/null 2>&1 && echo "Docker ready" && break
+            sleep 2
+          done
+          docker info >/dev/null 2>&1 || { echo "Docker timeout"; exit 1; }
+
+      - name: Start VNC desktop container
+        run: |
+          docker run -d \
+            --name desktop \
+            -p 5900:5900 \
+            -e RESOLUTION=1280x800 \
+            -e VNC_PASSWORD=testpass \
+            --shm-size=512m \
+            dorowu/ubuntu-desktop-lxde-vnc
+
+      - name: Install daemon
+        run: brew install ARAS-Workspace/tap/claude-kvm-daemon
+
+      - name: Wait for VNC
+        run: |
+          for i in $(seq 1 60); do
+            nc -z localhost 5900 && echo "VNC ready" && exit 0
+            sleep 1
+          done
+          echo "VNC timeout" && exit 1
+
+      - name: Run integration test
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VNC_HOST: 127.0.0.1
+          VNC_PORT: '5900'
+          VNC_PASSWORD: testpass
+          CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
+          SCREENSHOTS_DIR: ./test-screenshots
+          MODEL: ${{ inputs.model || 'claude-sonnet-4-5-20250929' }}
+          MAX_TURNS: ${{ inputs.max_turns || '30' }}
+        run: |
+          mkdir -p test-screenshots
+          node test/integration.js
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: test-screenshots/
+          if-no-files-found: ignore
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop desktop || true
+          docker rm desktop || true
