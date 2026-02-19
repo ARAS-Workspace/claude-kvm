@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 # Claude KVM — Integration Test
 #
-# macOS runner + Docker Desktop + VNC desktop container + Homebrew daemon.
-# Claude controls a remote LXDE desktop via VNC agentic loop.
+# macOS runner + Screen Sharing (ARD) + Homebrew daemon.
+# Claude controls the runner's macOS desktop via VNC agentic loop.
 
 name: Integration Test
 
@@ -49,46 +49,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Docker Desktop
-        run: |
-          curl -L -o Docker.dmg "https://desktop.docker.com/mac/main/arm64/Docker.dmg"
-          sudo hdiutil attach Docker.dmg
-          sudo /Volumes/Docker/Docker.app/Contents/MacOS/install
-          sudo hdiutil detach /Volumes/Docker
-          open /Applications/Docker.app
-          for i in $(seq 1 60); do
-            docker info >/dev/null 2>&1 && echo "Docker ready" && break
-            sleep 2
-          done
-          docker info >/dev/null 2>&1 || { echo "Docker timeout"; exit 1; }
-
-      - name: Start VNC desktop container
-        run: |
-          docker run -d \
-            --name desktop \
-            -p 5900:5900 \
-            -e RESOLUTION=1280x800 \
-            -e VNC_PASSWORD=testpass \
-            --shm-size=512m \
-            dorowu/ubuntu-desktop-lxde-vnc
-
       - name: Install daemon
         run: brew install ARAS-Workspace/tap/claude-kvm-daemon
 
-      - name: Wait for VNC
+      - name: Enable Screen Sharing (VNC)
         run: |
-          for i in $(seq 1 60); do
-            nc -z localhost 5900 && echo "VNC ready" && exit 0
-            sleep 1
-          done
-          echo "VNC timeout" && exit 1
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure -access -on -privs -all -restart -agent -allowAccessFor -allUsers
+          sleep 3
+          nc -z localhost 5900 && echo "VNC ready" || { echo "VNC not available"; exit 1; }
 
       - name: Run integration test
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           VNC_HOST: 127.0.0.1
           VNC_PORT: '5900'
-          VNC_PASSWORD: testpass
+          VNC_USERNAME: runner
+          VNC_PASSWORD: ''
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
           SCREENSHOTS_DIR: ./test-screenshots
           MODEL: ${{ inputs.model || 'claude-sonnet-4-5-20250929' }}
@@ -104,9 +81,3 @@ jobs:
           name: screenshots
           path: test-screenshots/
           if-no-files-found: ignore
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker stop desktop || true
-          docker rm desktop || true
