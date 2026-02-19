@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Set runner password
-        run: sudo dscl . -passwd /Users/runner "" testpass
+        run: sudo dscl . -passwd /Users/runner testpass
 
       - name: Enable ARD
         run: |
