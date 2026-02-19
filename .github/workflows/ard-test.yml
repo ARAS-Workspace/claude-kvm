@@ -36,5 +36,5 @@ jobs:
 
       - name: Test daemon connection
         run: |
-          echo '{"method":"health","id":1}' | timeout 15 claude-kvm-daemon \
+          echo '{"method":"health","id":1}' | gtimeout 15 claude-kvm-daemon \
             --host 127.0.0.1 --port 5900 --username vncuser --password testpass
