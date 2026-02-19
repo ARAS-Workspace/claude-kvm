@@ -36,7 +36,11 @@ jobs:
 
       - name: Test daemon connection
         run: |
-          OUTPUT=$( ( sleep 5; echo '{"method":"health","id":1}'; sleep 5 ) | claude-kvm-daemon \
-            --host 127.0.0.1 --port 5900 --username vncuser --password testpass 2>&1 )
-          echo "$OUTPUT"
-          echo "$OUTPUT" | grep -q '"result"' && echo "PASSED" || { echo "FAILED"; exit 1; }
+          ( sleep 5; echo '{"method":"health","id":1}'; sleep 5 ) | claude-kvm-daemon \
+            --host 127.0.0.1 --port 5900 --username vncuser --password testpass \
+            > /tmp/daemon-stdout.log 2> /tmp/daemon-stderr.log || true
+          echo "=== STDOUT ==="
+          cat /tmp/daemon-stdout.log
+          echo "=== STDERR ==="
+          cat /tmp/daemon-stderr.log
+          grep -q '"result"' /tmp/daemon-stdout.log && echo "PASSED" || { echo "FAILED"; exit 1; }
