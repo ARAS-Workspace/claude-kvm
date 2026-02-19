@@ -12,16 +12,7 @@ jobs:
 
     steps:
       - name: Create VNC user
-        run: |
-          sudo dscl . -create /Users/vncuser
-          sudo dscl . -create /Users/vncuser UserShell /bin/bash
-          sudo dscl . -create /Users/vncuser RealName "VNC User"
-          sudo dscl . -create /Users/vncuser UniqueID "1099"
-          sudo dscl . -create /Users/vncuser PrimaryGroupID 20
-          sudo dscl . -create /Users/vncuser NFSHomeDirectory /Users/vncuser
-          sudo dscl . -passwd /Users/vncuser testpass
-          sudo dscl . -append /Groups/admin GroupMembership vncuser
-          sudo createhomedir -c -u vncuser
+        run: sudo sysadminctl -addUser vncuser -password testpass -admin
 
       - name: Enable ARD for vncuser
         run: |
