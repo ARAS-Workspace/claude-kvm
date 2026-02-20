@@ -150,7 +150,10 @@ jobs:
 
       - name: Build composite (split-screen)
         run: |
-          ffmpeg -y -i demo-terminal.mp4 -i demo-screen.mp4 \
+          TAG="${{ github.ref_name }}"
+
+          # Screen left, terminal right
+          ffmpeg -y -i demo-screen.mp4 -i demo-terminal.mp4 \
             -filter_complex "
               [0:v]scale=-2:720[left];
               [1:v]scale=-2:720[right];
@@ -159,20 +162,26 @@ jobs:
             -c:v libx264 -crf 18 -preset slow \
             -pix_fmt yuv420p -movflags +faststart \
             -shortest \
-            demo-composite.mp4
+            "${TAG}.mp4"
+
+          # MP4 → GIF (high quality palette)
+          ffmpeg -y -i "${TAG}.mp4" \
+            -vf "fps=10,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
+            "${TAG}.gif"
 
           echo "=== Output files ==="
-          ls -lh demo-*.mp4 demo-*.gif demo.cast
+          ls -lh "${TAG}".* demo-*.mp4 demo-*.gif demo.cast
 
       # ── Upload ──────────────────────────────────────────
 
       - name: Upload demo assets
         uses: actions/upload-artifact@v4
         with:
-          name: demo-assets
+          name: ${{ github.ref_name }}
           path: |
             demo.cast
             demo-terminal.gif
             demo-terminal.mp4
             demo-screen.mp4
-            demo-composite.mp4
+            ${{ github.ref_name }}.mp4
+            ${{ github.ref_name }}.gif
