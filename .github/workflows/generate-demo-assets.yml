@@ -97,6 +97,7 @@ jobs:
       - name: Build terminal MP4
         run: |
           ffmpeg -y -i demo-terminal.gif \
+            -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" \
             -c:v libx264 -crf 18 -preset slow \
             -pix_fmt yuv420p -r 30 \
             -movflags +faststart \
