@@ -136,7 +136,7 @@ Proje dizinine `.mcp.json` dosyası oluşturun:
   "mcpServers": {
     "claude-kvm": {
       "command": "npx",
-      "args": ["-y", "github:ARAS-Workspace/claude-kvm"],
+      "args": ["-y", "claude-kvm"],
       "env": {
         "VNC_HOST": "192.168.1.100",
         "VNC_PORT": "5900",
