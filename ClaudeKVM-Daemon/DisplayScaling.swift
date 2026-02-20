@@ -1,14 +1,27 @@
 import Foundation
 
-struct DisplayScaling {
+final class DisplayScaling {
     let nativeWidth: Int
     let nativeHeight: Int
-    let scaledWidth: Int
-    let scaledHeight: Int
+    private(set) var scaledWidth: Int
+    private(set) var scaledHeight: Int
+    private(set) var maxDimension: Int
 
     init(nativeWidth: Int, nativeHeight: Int, maxDimension: Int = 1280) {
         self.nativeWidth = nativeWidth
         self.nativeHeight = nativeHeight
+        self.maxDimension = maxDimension
+        let ratio = min(
+            Double(maxDimension) / Double(nativeWidth),
+            Double(maxDimension) / Double(nativeHeight),
+            1.0
+        )
+        self.scaledWidth = Int((Double(nativeWidth) * ratio).rounded())
+        self.scaledHeight = Int((Double(nativeHeight) * ratio).rounded())
+    }
+
+    func reconfigure(maxDimension: Int) {
+        self.maxDimension = maxDimension
         let ratio = min(
             Double(maxDimension) / Double(nativeWidth),
             Double(maxDimension) / Double(nativeHeight),

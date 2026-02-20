@@ -14,7 +14,7 @@ struct ClaudeKVMDaemon: AsyncParsableCommand {
             ██║  ██║██║  ██║██║  ██║███████║
             ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
 
-            Copyright (c) 2025 Riza Emre ARAS <r.emrearas@proton.me>
+            Copyright (c) 2026 Riza Emre ARAS <r.emrearas@proton.me>
             Released under the MIT License - see LICENSE for details.
 
             Long-running VNC client daemon for AI-driven desktop control.
@@ -52,10 +52,72 @@ struct ClaudeKVMDaemon: AsyncParsableCommand {
                 key_type       {text}                   Type text character by character
                 paste          {text}                   Paste via clipboard + combo
 
+              Detection:
+                detect_elements                         OCR text detection with bounding boxes
+
+              Configuration:
+                configure      {<params>}               Set timing/display params at runtime
+                configure      {reset: true}            Reset all params to defaults
+                get_timing                              Get current timing + display params
+
               Control:
                 wait           {ms?}                    Pause (default 500ms)
                 health                                  Connection state + display info
                 shutdown                                Graceful exit
+
+            CONFIGURE PARAMETERS (all optional, runtime-adjustable via PC):
+              All timing values are in milliseconds.
+              Default values are used at startup — no CLI overrides needed.
+              Use the "configure" method to change values at runtime.
+              Use "get_timing" to inspect current values.
+
+              Display:
+                max_dimension        Max screenshot dimension in px    (default: 1280)
+                cursor_crop_radius   Cursor crop radius in px         (default: 150)
+
+              Mouse:
+                click_hold_ms        Click hold duration               (default: 50)
+                double_click_gap_ms  Inter-click gap                   (default: 50)
+                hover_settle_ms      Hover settle wait                 (default: 400)
+
+              Drag:
+                drag_position_ms     Position settle before press      (default: 30)
+                drag_press_ms        Press hold for drag threshold     (default: 50)
+                drag_step_ms         Between interpolation points      (default: 5)
+                drag_settle_ms       Settle before release             (default: 30)
+                drag_pixels_per_step Point density in pixels           (default: 20)
+                drag_min_steps       Minimum interpolation steps       (default: 10)
+
+              Scroll:
+                scroll_press_ms      Scroll press-release gap          (default: 10)
+                scroll_tick_ms       Inter-tick delay                  (default: 20)
+
+              Keyboard:
+                key_hold_ms          Single key hold duration          (default: 30)
+                combo_mod_ms         Modifier settle delay             (default: 10)
+
+              Typing:
+                type_key_ms          Key hold during typing            (default: 20)
+                type_inter_key_ms    Between characters                (default: 20)
+                type_shift_ms        Shift key settle                  (default: 10)
+                paste_settle_ms      After clipboard write             (default: 30)
+
+            CONFIGURE EXAMPLES:
+              Set timing:
+                {"method":"configure","params":{"click_hold_ms":80,"key_hold_ms":50},"id":1}
+                → {"result":{"detail":"OK — changed: click_hold_ms, key_hold_ms"},"id":1}
+
+              Change display scaling:
+                {"method":"configure","params":{"max_dimension":960},"id":2}
+                → {"result":{"detail":"OK — changed: max_dimension","scaledWidth":960,"scaledHeight":584},"id":2}
+
+              Reset to defaults:
+                {"method":"configure","params":{"reset":true},"id":3}
+                → {"result":{"detail":"OK — reset to defaults","timing":{...}},"id":3}
+
+              Get current values:
+                {"method":"get_timing","id":4}
+                → {"result":{"timing":{"click_hold_ms":50,...},"scaledWidth":1280,"scaledHeight":779},"id":4}
 
             NOTIFICATIONS (server → caller, no id):
               vnc_state      {state}                    Connection state changes
@@ -63,50 +125,19 @@ struct ClaudeKVMDaemon: AsyncParsableCommand {
 
             COORDINATE SYSTEM:
               All coordinates are in scaled display space.
-              Native resolution is scaled to fit within --max-dimension.
+              Native resolution is scaled to fit within max_dimension (default 1280).
               Example: 4220×2568 native → 1280×779 scaled (at max 1280)
+              max_dimension can be changed at runtime via configure.
 
             macOS DETECTION:
               Automatic via ARD auth type 30 credential request.
               When detected, Meta_L keysyms are remapped to Super_L
               for correct Command key behavior on Apple VNC servers.
 
-            INPUT TIMING (all in milliseconds, all optional with defaults):
-              Mouse:
-                --click-hold-ms          Click hold duration            (default: 50)
-                --double-click-gap-ms    Inter-click gap                (default: 50)
-                --hover-settle-ms        Hover settle wait              (default: 400)
-
-              Drag:
-                --drag-position-ms       Position settle before press   (default: 30)
-                --drag-press-ms          Press hold for drag threshold  (default: 50)
-                --drag-step-ms           Between interpolation points   (default: 5)
-                --drag-settle-ms         Settle before release          (default: 30)
-                --drag-pixels-per-step   Point density in pixels        (default: 20)
-                --drag-min-steps         Minimum interpolation steps    (default: 10)
-
-              Scroll:
-                --scroll-press-ms        Scroll press-release gap       (default: 10)
-                --scroll-tick-ms         Inter-tick delay               (default: 20)
-
-              Keyboard:
-                --key-hold-ms            Single key hold duration       (default: 30)
-                --combo-mod-ms           Modifier settle delay          (default: 10)
-
-              Typing:
-                --type-key-ms            Key hold during typing         (default: 20)
-                --type-inter-key-ms      Between characters             (default: 20)
-                --type-shift-ms          Shift key settle               (default: 10)
-                --paste-settle-ms        After clipboard write          (default: 30)
-
-              Display:
-                --cursor-crop-radius     Cursor crop radius in pixels   (default: 150)
-
             EXAMPLES:
               claude-kvm-daemon --host 192.168.1.100 --port 5900 --password secret
               claude-kvm-daemon --host 10.0.0.1 --port 5900 --username admin --password pass -v
               claude-kvm-daemon --host 10.0.0.1 --port 5900 --password pass --max-dimension 800
-              claude-kvm-daemon --host 10.0.0.1 --port 5900 --password pass --click-hold-ms 80 --key-hold-ms 50
 
             OUTPUT:
               stdout  PC responses and notifications (NDJSON).
@@ -135,74 +166,8 @@ struct ClaudeKVMDaemon: AsyncParsableCommand {
 
     // MARK: - Display
 
-    @Option(name: .long, help: "Max screenshot dimension in pixels.")
+    @Option(name: .long, help: "Initial max screenshot dimension in pixels (adjustable at runtime via configure).")
     var maxDimension: Int = 1280
-
-    // MARK: - Mouse Timing
-
-    @Option(name: .long, help: "Click hold duration in ms.")
-    var clickHoldMs: Int?
-
-    @Option(name: .long, help: "Double-click inter-click gap in ms.")
-    var doubleClickGapMs: Int?
-
-    @Option(name: .long, help: "Hover settle wait in ms.")
-    var hoverSettleMs: Int?
-
-    // MARK: - Drag Timing
-
-    @Option(name: .long, help: "Drag position settle in ms.")
-    var dragPositionMs: Int?
-
-    @Option(name: .long, help: "Drag press hold for threshold in ms.")
-    var dragPressMs: Int?
-
-    @Option(name: .long, help: "Drag interpolation step delay in ms.")
-    var dragStepMs: Int?
-
-    @Option(name: .long, help: "Drag settle before release in ms.")
-    var dragSettleMs: Int?
-
-    @Option(name: .long, help: "Drag point density in pixels.")
-    var dragPixelsPerStep: Double?
-
-    @Option(name: .long, help: "Drag minimum interpolation steps.")
-    var dragMinSteps: Int?
-
-    // MARK: - Scroll Timing
-
-    @Option(name: .long, help: "Scroll press-release gap in ms.")
-    var scrollPressMs: Int?
-
-    @Option(name: .long, help: "Scroll inter-tick delay in ms.")
-    var scrollTickMs: Int?
-
-    // MARK: - Keyboard Timing
-
-    @Option(name: .long, help: "Key press hold duration in ms.")
-    var keyHoldMs: Int?
-
-    @Option(name: .long, help: "Combo modifier settle delay in ms.")
-    var comboModMs: Int?
-
-    // MARK: - Typing Timing
-
-    @Option(name: .long, help: "Typing key hold in ms.")
-    var typeKeyMs: Int?
-
-    @Option(name: .long, help: "Typing inter-key delay in ms.")
-    var typeInterKeyMs: Int?
-
-    @Option(name: .long, help: "Typing shift settle in ms.")
-    var typeShiftMs: Int?
-
-    @Option(name: .long, help: "Paste clipboard settle in ms.")
-    var pasteSettleMs: Int?
-
-    // MARK: - Display Tuning
-
-    @Option(name: .long, help: "Cursor crop radius in pixels.")
-    var cursorCropRadius: Int?
 
     // MARK: - VNC Tuning
 
@@ -275,28 +240,7 @@ struct ClaudeKVMDaemon: AsyncParsableCommand {
             "scaledHeight": .int(scaling.scaledHeight),
         ])
 
-        // Build timing from CLI overrides (all optional, defaults in InputTiming)
-        var timing = InputTiming()
-        if let v = clickHoldMs { timing.clickHoldUs = UInt32(v) * 1000 }
-        if let v = doubleClickGapMs { timing.doubleClickGapUs = UInt32(v) * 1000 }
-        if let v = hoverSettleMs { timing.hoverSettleUs = UInt32(v) * 1000 }
-        if let v = dragPositionMs { timing.dragPositionUs = UInt32(v) * 1000 }
-        if let v = dragPressMs { timing.dragPressUs = UInt32(v) * 1000 }
-        if let v = dragStepMs { timing.dragStepUs = UInt32(v) * 1000 }
-        if let v = dragSettleMs { timing.dragSettleUs = UInt32(v) * 1000 }
-        if let v = dragPixelsPerStep { timing.dragPixelsPerStep = v }
-        if let v = dragMinSteps { timing.dragMinSteps = v }
-        if let v = scrollPressMs { timing.scrollPressUs = UInt32(v) * 1000 }
-        if let v = scrollTickMs { timing.scrollTickUs = UInt32(v) * 1000 }
-        if let v = keyHoldMs { timing.keyHoldUs = UInt32(v) * 1000 }
-        if let v = comboModMs { timing.comboModUs = UInt32(v) * 1000 }
-        if let v = typeKeyMs { timing.typeKeyUs = UInt32(v) * 1000 }
-        if let v = typeInterKeyMs { timing.typeInterKeyUs = UInt32(v) * 1000 }
-        if let v = typeShiftMs { timing.typeShiftUs = UInt32(v) * 1000 }
-        if let v = pasteSettleMs { timing.pasteSettleUs = UInt32(v) * 1000 }
-        if let v = cursorCropRadius { timing.cursorCropRadius = v }
-
-        let input = InputController(vnc: vnc, timing: timing)
+        let input = InputController(vnc: vnc)
 
         await runCommandLoop(vnc: vnc, input: input, scaling: scaling)
 

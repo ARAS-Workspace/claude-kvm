@@ -1,6 +1,7 @@
 import Foundation
 import CoreGraphics
 import AppKit
+import Vision
 
 extension ClaudeKVMDaemon {
 
@@ -118,6 +119,60 @@ extension ClaudeKVMDaemon {
             ), let cgImage = ctx.makeImage() else { return nil }
             let rep = NSBitmapImageRep(cgImage: cgImage)
             return rep.representation(using: .png, properties: [:])
+        }
+    }
+
+    // MARK: - OCR Element Detection
+
+    func detectTextElements(
+        buffer: UnsafeRawBufferPointer,
+        width: Int, height: Int,
+        scaling: DisplayScaling
+    ) -> [TextElement] {
+        guard let baseAddress = buffer.baseAddress else { return [] }
+        let bytesPerRow = width * 4
+
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                  data: UnsafeMutableRawPointer(mutating: baseAddress),
+                  width: width,
+                  height: height,
+                  bitsPerComponent: 8,
+                  bytesPerRow: bytesPerRow,
+                  space: colorSpace,
+                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+              ),
+              let cgImage = context.makeImage() else {
+            return []
+        }
+
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = false
+
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        try? handler.perform([request])
+
+        guard let observations = request.results else { return [] }
+
+        let sw = CGFloat(scaling.scaledWidth)
+        let sh = CGFloat(scaling.scaledHeight)
+
+        return observations.compactMap { observation in
+            guard let candidate = observation.topCandidates(1).first else { return nil }
+            let box = observation.boundingBox
+
+            // Vision: normalized (0-1), bottom-left origin → scaled pixels, top-left origin
+            let elX = Int((box.origin.x * sw).rounded())
+            let elY = Int(((1 - box.origin.y - box.height) * sh).rounded())
+            let elW = Int((box.width * sw).rounded())
+            let elH = Int((box.height * sh).rounded())
+
+            return TextElement(
+                text: candidate.string,
+                elX: elX, elY: elY, elW: elW, elH: elH,
+                confidence: Double(candidate.confidence)
+            )
         }
     }
 
