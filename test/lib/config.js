@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: MIT
+// noinspection JSUnresolvedReference
+// noinspection JSUnresolvedVariable
+
 import 'dotenv/config';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -16,12 +19,23 @@ export function loadPrompt(agent) {
   return readFileSync(resolve(testDir, 'agents', agent, 'system_prompt.md'), 'utf-8').trim();
 }
 
+// API keys
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-opus-4-6';
+
+// Models
+export const PLANNER_MODEL = process.env.PLANNER_MODEL || 'claude-opus-4-6';
+export const EXECUTOR_MODEL = process.env.EXECUTOR_MODEL || 'claude-haiku-4-5-20251001';
 export const OBSERVER_MODEL = process.env.OBSERVER_MODEL || 'qwen/qwen3-vl-235b-a22b-instruct';
-export const MAX_TURNS = parseInt(process.env.MAX_TURNS || '50', 10);
+
+// Turn limits
+export const PLANNER_MAX_TURNS = parseInt(process.env.PLANNER_MAX_TURNS || '15', 10);
+export const EXECUTOR_MAX_TURNS = parseInt(process.env.EXECUTOR_MAX_TURNS || '5', 10);
+
+// Task
 export const TASK = loadFile('test_prompt.md', 'TASK');
+
+// Connection
 export const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || './test-screenshots';
 export const CONNECT_RETRIES = parseInt(process.env.CONNECT_RETRIES || '12', 10);
 export const CONNECT_RETRY_DELAY = parseInt(process.env.CONNECT_RETRY_DELAY || '10000', 10);

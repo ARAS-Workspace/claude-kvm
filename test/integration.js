@@ -15,53 +15,59 @@
  */
 
 /**
- * Integration test — Claude orchestrator with full VNC access + vision observer.
+ * Hierarchical integration test — Planner + Executor + Observer.
  *
- * Claude is the primary agent with direct VNC control.
- * The observer (Qwen3-VL) provides screen state verification via verify().
+ * Opus (planner) breaks the task into sub-tasks and dispatches them.
+ * Haiku (executor) executes each sub-task with fresh context and VNC access.
+ * Qwen-VL (observer) provides independent screen verification via verify().
  *
  * Environment variables:
- *   ANTHROPIC_API_KEY   — required (Claude)
- *   OPENROUTER_API_KEY  — optional (observer — Claude can work without it)
- *   CLAUDE_MODEL        — orchestrator (default: claude-opus-4-6)
- *   OBSERVER_MODEL      — vision observer for verify() (default: qwen/qwen3-vl-235b-a22b-instruct)
- *   MAX_TURNS           — max Claude turns (default: 25)
+ *   ANTHROPIC_API_KEY     — required
+ *   OPENROUTER_API_KEY    — optional (observer)
+ *   PLANNER_MODEL         — planner model (default: claude-opus-4-6)
+ *   EXECUTOR_MODEL        — executor model (default: claude-haiku-4-5-20251001)
+ *   OBSERVER_MODEL        — observer model (default: qwen/qwen3-vl-235b-a22b-instruct)
+ *   PLANNER_MAX_TURNS     — max planner turns (default: 15)
+ *   EXECUTOR_MAX_TURNS    — max executor turns per dispatch (default: 5)
  *   VNC_HOST / VNC_PORT / VNC_PASSWORD / VNC_USERNAME
- *   SCREENSHOTS_DIR     — screenshot output (default: ./test-screenshots)
+ *   SCREENSHOTS_DIR       — screenshot output (default: ./test-screenshots)
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import {
   ANTHROPIC_API_KEY, OPENROUTER_API_KEY,
-  CLAUDE_MODEL, OBSERVER_MODEL,
-  MAX_TURNS, TASK,
+  PLANNER_MODEL, EXECUTOR_MODEL, OBSERVER_MODEL,
+  PLANNER_MAX_TURNS, EXECUTOR_MAX_TURNS, TASK,
 } from './lib/config.js';
 import { loadPrompt } from './lib/config.js';
-import { log, saveScreenshot } from './lib/log.js';
+import { log } from './lib/log.js';
 import { connectMCP } from './lib/mcp.js';
-import { observe } from './lib/observer.js';
+import { executeSubTask } from './lib/executor.js';
 
-// ── Claude Tools ───────────────────────────────────────────
+// ── Planner Tools ─────────────────────────────────────────
 
-/** @type {import('@anthropic-ai/sdk').Tool[]} */
-const CUSTOM_TOOLS = [
+const PLANNER_TOOLS = [
   {
-    name: 'verify',
-    description: 'Ask a question about the current screen state. Takes a screenshot internally and sends it to the vision observer. Returns a concise text answer (1-3 sentences). Use instead of screenshot to save context.',
+    name: 'dispatch',
+    description: [
+      'Send an instruction to the UI executor agent.',
+      'The executor sees the current screen, performs VNC actions, verifies via observer, and reports back.',
+      'Returns a text report: [success] or [error] with details.',
+    ].join(' '),
     input_schema: {
       type: 'object',
       properties: {
-        question: {
+        instruction: {
           type: 'string',
-          description: 'What to check, e.g. "Is Firefox open?", "What URL is in the address bar?"',
+          description: 'Clear, specific instruction for the executor',
         },
       },
-      required: ['question'],
+      required: ['instruction'],
     },
   },
   {
     name: 'task_complete',
-    description: 'Call when the task is fully completed.',
+    description: 'The entire task has been completed successfully.',
     input_schema: {
       type: 'object',
       properties: {
@@ -72,7 +78,7 @@ const CUSTOM_TOOLS = [
   },
   {
     name: 'task_failed',
-    description: 'Call when the task cannot be completed.',
+    description: 'The task cannot be completed.',
     input_schema: {
       type: 'object',
       properties: {
@@ -83,7 +89,7 @@ const CUSTOM_TOOLS = [
   },
 ];
 
-// ── Main ───────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────
 
 async function main() {
   if (!ANTHROPIC_API_KEY) {
@@ -97,9 +103,9 @@ async function main() {
 
   const { mcp, screenWidth, screenHeight } = await connectMCP();
   const anthropic = new Anthropic();
-  const systemPrompt = loadPrompt('claude');
+  const plannerPrompt = loadPrompt('planner');
 
-  // Combine MCP tools + custom tools
+  // Get MCP tools for executor
   const mcpToolsResult = await mcp.listTools();
   const mcpTools = mcpToolsResult.tools
     .filter(t => t.name !== 'task_complete' && t.name !== 'task_failed')
@@ -108,153 +114,75 @@ async function main() {
       description: t.description,
       input_schema: t.inputSchema || { type: 'object', properties: {} },
     }));
-  const tools = [...mcpTools, ...CUSTOM_TOOLS];
 
-  log('INIT', `Tools: ${tools.map(t => t.name).join(', ')}`);
-  log('INIT', `Claude: ${CLAUDE_MODEL}`);
-  log('INIT', `Observer: ${OBSERVER_MODEL}${OPENROUTER_API_KEY ? '' : ' (no key — disabled)'}`);
-  log('INIT', `Turns: ${MAX_TURNS}`);
+  log('INIT', `MCP tools: ${mcpTools.map(t => t.name).join(', ')}`);
+  log('INIT', `Planner: ${PLANNER_MODEL} (max ${PLANNER_MAX_TURNS} turns)`);
+  log('INIT', `Executor: ${EXECUTOR_MODEL} (max ${EXECUTOR_MAX_TURNS} turns/dispatch)`);
+  log('INIT', `Observer: ${OBSERVER_MODEL}${OPENROUTER_API_KEY ? '' : ' (disabled)'}`);
   log('INIT', `Display: ${screenWidth}×${screenHeight}`);
   log('INIT', `Task: ${TASK.slice(0, 120)}...`);
 
   log('TEST', '\u2550'.repeat(60));
-  log('TEST', 'Starting — Claude + Observer');
+  log('TEST', 'Starting — Planner + Executor + Observer');
   log('TEST', '\u2550'.repeat(60));
 
   /** @type {import('@anthropic-ai/sdk').MessageParam[]} */
-  const messages = [{ role: 'user', content: [{ type: 'text', text: TASK }] }];
+  const messages = [{ role: 'user', content: TASK }];
 
-  for (let turn = 1; turn <= MAX_TURNS; turn++) {
-    log('TURN', `${turn}/${MAX_TURNS}`);
+  for (let turn = 1; turn <= PLANNER_MAX_TURNS; turn++) {
+    log('PLAN', `turn ${turn}/${PLANNER_MAX_TURNS}`);
 
     const response = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 4096,
-      system: systemPrompt,
+      model: PLANNER_MODEL,
+      max_tokens: 2048,
+      system: plannerPrompt,
       messages,
-      tools,
+      tools: PLANNER_TOOLS,
     });
 
-    let hasToolUse = false;
     const toolResults = [];
 
     for (const block of response.content) {
       if (block.type === 'text' && block.text.trim()) {
-        log('CLAUDE', block.text);
+        log('PLANNER', block.text);
       }
 
-      if (block.type === 'tool_use') {
-        hasToolUse = true;
+      if (block.type !== 'tool_use') continue;
 
-        // ── Terminal ──
-        if (block.name === 'task_complete') {
-          log('TEST', '\u2550'.repeat(60));
-          log('TEST', `PASSED \u2014 ${block.input.summary}`);
-          log('TEST', '\u2550'.repeat(60));
-          await mcp.close();
-          process.exit(0);
-        }
+      // ── Terminal ──
+      if (block.name === 'task_complete') {
+        log('TEST', '\u2550'.repeat(60));
+        log('TEST', `PASSED \u2014 ${block.input.summary}`);
+        log('TEST', '\u2550'.repeat(60));
+        await mcp.close();
+        process.exit(0);
+      }
 
-        if (block.name === 'task_failed') {
-          log('TEST', '\u2550'.repeat(60));
-          log('TEST', `FAILED \u2014 ${block.input.reason}`);
-          log('TEST', '\u2550'.repeat(60));
-          await mcp.close();
-          process.exit(1);
-        }
+      if (block.name === 'task_failed') {
+        log('TEST', '\u2550'.repeat(60));
+        log('TEST', `FAILED \u2014 ${block.input.reason}`);
+        log('TEST', '\u2550'.repeat(60));
+        await mcp.close();
+        process.exit(1);
+      }
 
-        // ── Verify (Observer) ──
-        if (block.name === 'verify') {
-          log('VERIFY', block.input.question);
+      // ── Dispatch to executor ──
+      if (block.name === 'dispatch') {
+        log('DISPATCH', block.input.instruction);
+        const result = await executeSubTask(block.input.instruction, mcp, mcpTools);
+        const reportText = `[${result.status}] ${result.summary}`;
+        log('DISPATCH-RESULT', reportText);
 
-          const answer = await observe(block.input.question, mcp);
-          log('VERIFY-RESULT', answer);
-
-          toolResults.push({
-            type: 'tool_result',
-            tool_use_id: block.id,
-            content: [{ type: 'text', text: answer }],
-          });
-        }
-
-        // ── Action Queue ──
-        if (block.name === 'action_queue') {
-          log('QUEUE', `${block.input.actions.length} actions`);
-
-          try {
-            const result = await mcp.callTool({
-              name: 'action_queue',
-              arguments: block.input,
-            });
-
-            const text = result.content?.[0]?.text || 'OK';
-            log('QUEUE-RESULT', text);
-
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: block.id,
-              content: [{ type: 'text', text }],
-            });
-          } catch (err) {
-            log('QUEUE-ERROR', err.message);
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: block.id,
-              content: [{ type: 'text', text: `Error: ${err.message}` }],
-              is_error: true,
-            });
-          }
-        }
-
-        // ── Direct VNC ──
-        if (block.name === 'vnc_command') {
-          log('VNC', `${block.input.action}(${JSON.stringify(block.input)})`);
-
-          try {
-            const result = await mcp.callTool({
-              name: 'vnc_command',
-              arguments: block.input,
-            });
-
-            const content = [];
-            for (const item of result.content) {
-              if (item.type === 'text') {
-                content.push({ type: 'text', text: item.text });
-                log('VNC-RESULT', item.text);
-              } else if (item.type === 'image') {
-                content.push({
-                  type: 'image',
-                  source: {
-                    type: 'base64',
-                    media_type: item.mimeType || 'image/png',
-                    data: item.data,
-                  },
-                });
-                log('VNC-RESULT', '[screenshot]');
-                saveScreenshot(item.data);
-              }
-            }
-
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: block.id,
-              content,
-            });
-          } catch (err) {
-            log('VNC-ERROR', `${block.input.action}: ${err.message}`);
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: block.id,
-              content: [{ type: 'text', text: `Error: ${err.message}` }],
-              is_error: true,
-            });
-          }
-        }
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: [{ type: 'text', text: reportText }],
+        });
       }
     }
 
-    if (!hasToolUse) {
-      log('TEST', 'No tool calls \u2014 ending');
+    if (toolResults.length === 0) {
+      log('TEST', 'No dispatch — ending');
       break;
     }
 
@@ -263,7 +191,7 @@ async function main() {
   }
 
   log('TEST', '\u2550'.repeat(60));
-  log('TEST', 'FAILED \u2014 Max turns reached');
+  log('TEST', 'FAILED \u2014 Max planner turns reached');
   log('TEST', '\u2550'.repeat(60));
 
   await mcp.close();
