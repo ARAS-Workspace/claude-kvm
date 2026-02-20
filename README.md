@@ -2,6 +2,8 @@
 
 Claude KVM is an MCP tool that controls remote desktop environments over VNC. It consists of a thin JS proxy layer (MCP server) and a platform-native Swift VNC daemon running on your macOS system.
 
+![Claude KVM Demo](test/assets/press-kit-assets-22242573195.gif)
+
 ## Architecture
 
 ```mermaid
