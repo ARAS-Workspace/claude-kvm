@@ -1,0 +1,146 @@
+# SPDX-License-Identifier: MIT
+# Claude KVM — E2E Integration Test
+#
+# Single macOS runner with VNC legacy auth (type 2) via auth proxy.
+# Enables Screen Sharing, strips ARD type 30, runs Claude agentic test.
+
+name: Integration Test
+
+on:
+  push:
+    tags:
+      - 'e2e-test-v*'
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'Claude model to use'
+        required: false
+        default: 'claude-sonnet-4-5-20250929'
+        type: choice
+        options:
+          - claude-sonnet-4-5-20250929
+          - claude-opus-4-6
+          - claude-haiku-4-5-20251001
+      max_turns:
+        description: 'Maximum agentic turns'
+        required: false
+        default: '30'
+        type: string
+
+env:
+  TZ: Europe/Istanbul
+
+# ─────────────────────────────────────────────────────────────
+
+jobs:
+  integration-test:
+    runs-on: macos-26
+    timeout-minutes: 25
+
+    steps:
+      - name: Disable sleep
+        run: |
+          caffeinate -u -t 600 &
+          sudo pmset -a displaysleep 0 sleep 0
+
+      - name: Set runner password and configure auto-login
+        run: |
+          PASSWORD="testpass"
+          USER=$(whoami)
+          echo "=== Setting password for $USER ==="
+          sudo sysadminctl -resetPasswordFor "$USER" -newPassword "$PASSWORD" 2>&1 || \
+            sudo dscl . -passwd "/Users/$USER" "$PASSWORD" 2>&1 || \
+            echo "Warning: could not set password"
+
+          echo "=== Configuring auto-login ==="
+          sudo defaults write /Library/Preferences/com.apple.loginwindow autoLoginUser "$USER"
+
+          echo "=== Writing kcpassword ==="
+          python3 -c "
+          import sys
+          key = [0x7D, 0x89, 0x52, 0x23, 0xD2, 0xBC, 0xDD, 0xEA, 0xA3, 0xB9, 0x1F]
+          pw = '$PASSWORD' + chr(0)
+          while len(pw) % 12 != 0:
+              pw += chr(0)
+          sys.stdout.buffer.write(bytes([ord(pw[i]) ^ key[i % len(key)] for i in range(len(pw))]))
+          " | sudo tee /etc/kcpassword > /dev/null
+          sudo chmod 600 /etc/kcpassword
+
+          echo "=== Disabling screensaver lock ==="
+          sudo defaults write com.apple.screensaver askForPassword -int 0
+          sudo defaults write com.apple.screensaver idleTime -int 0
+
+          echo "=== Restarting loginwindow ==="
+          sudo killall loginwindow 2>/dev/null || true
+          sleep 5
+
+      - name: Grant screen recording permission
+        run: |
+          TCC_DB="/Library/Application Support/com.apple.TCC/TCC.db"
+          echo "=== TCC schema ==="
+          sudo sqlite3 "$TCC_DB" ".schema access"
+          echo "=== Granting screen capture ==="
+          for client in com.apple.screensharing.agent com.apple.RemoteDesktop; do
+            sudo sqlite3 "$TCC_DB" \
+              "INSERT OR REPLACE INTO access (service, client, client_type, auth_value, auth_reason, auth_version) VALUES ('kTCCServiceScreenCapture', '$client', 0, 2, 4, 1);"
+          done
+          echo "=== Verifying ==="
+          sudo sqlite3 "$TCC_DB" "SELECT service, client, auth_value FROM access WHERE service='kTCCServiceScreenCapture';"
+
+      - name: Enable Screen Sharing with VNC legacy auth
+        run: |
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure \
+            -access -on \
+            -clientopts -setvnclegacy -vnclegacy yes \
+            -setvncpw -vncpw testpass \
+            -restart -agent -privs -all
+
+      - name: Wait for VNC port
+        run: |
+          for i in $(seq 1 15); do
+            nc -z localhost 5900 2>/dev/null && echo "VNC port 5900 open" && exit 0
+            sleep 1
+          done
+          echo "VNC port not open" && exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install daemon
+        run: brew install ARAS-Workspace/tap/claude-kvm-daemon
+
+      - name: Start auth proxy
+        run: |
+          node test/vnc-auth-proxy.js 5901 5900 &
+          sleep 1
+
+      - name: Run integration test
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VNC_HOST: 127.0.0.1
+          VNC_PORT: '5901'
+          VNC_PASSWORD: testpass
+          CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
+          SCREENSHOTS_DIR: ./test-screenshots
+          MODEL: ${{ inputs.model || 'claude-sonnet-4-5-20250929' }}
+          MAX_TURNS: ${{ inputs.max_turns || '30' }}
+        run: |
+          mkdir -p test-screenshots
+          node test/integration.js
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: test-screenshots/
+          if-no-files-found: ignore

@@ -1,0 +1,98 @@
+# SPDX-License-Identifier: MIT
+# Claude KVM — macOS VNC Legacy Mode Test
+#
+# Tests whether Screen Sharing with VNC legacy auth (type 2)
+# works on GitHub macOS runners via an auth proxy that strips ARD type 30.
+
+name: VNC Legacy Test
+
+on:
+  workflow_dispatch:
+
+env:
+  TZ: Europe/Istanbul
+
+jobs:
+  vnc-legacy:
+    runs-on: macos-26
+    timeout-minutes: 10
+
+    steps:
+      - name: System info
+        run: |
+          sw_vers
+          echo "---"
+          system_profiler SPHardwareDataType | head -20
+
+      - name: Enable Screen Sharing with VNC legacy auth
+        run: |
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure \
+            -access -on \
+            -clientopts -setvnclegacy -vnclegacy yes \
+            -setvncpw -vncpw testpass \
+            -restart -agent -privs -all
+
+      - name: Wait for VNC port
+        run: |
+          for i in $(seq 1 15); do
+            if nc -z localhost 5900 2>/dev/null; then
+              echo "VNC port 5900 open (attempt $i)"
+              exit 0
+            fi
+            echo "Waiting... ($i/15)"
+            sleep 1
+          done
+          echo "VNC port not open after 15s"
+          exit 1
+
+      - name: Verify RFB handshake
+        run: |
+          echo "" | nc -w 3 localhost 5900 | head -c 20 | cat -v
+          echo ""
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install daemon
+        run: brew install ARAS-Workspace/tap/claude-kvm-daemon
+
+      - name: Start auth proxy
+        run: |
+          node test/vnc-auth-proxy.js 5901 5900 &
+          sleep 1
+          echo "Auth proxy started"
+
+      - name: Test daemon connection
+        run: |
+          {
+            sleep 5
+            echo '{"id":1,"method":"health","params":{}}'
+            sleep 3
+            echo '{"id":2,"method":"screenshot","params":{}}'
+            sleep 3
+          } | claude-kvm-daemon \
+            --host 127.0.0.1 \
+            --port 5901 \
+            --password testpass \
+            2>&1 | tee /tmp/daemon-output.txt &
+          DAEMON_PID=$!
+
+          sleep 15
+          kill $DAEMON_PID 2>/dev/null || true
+          wait $DAEMON_PID 2>/dev/null || true
+
+          echo "=== Daemon output ==="
+          cat /tmp/daemon-output.txt
+
+          if grep -q '"ready"' /tmp/daemon-output.txt; then
+            echo "PASS: Daemon connected successfully"
+          else
+            echo "FAIL: Daemon did not connect"
+            exit 1
+          fi
