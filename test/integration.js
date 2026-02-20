@@ -95,13 +95,22 @@ async function main() {
     log('WARN', 'OPENROUTER_API_KEY not set — verify() will be unavailable');
   }
 
-  const { mcp, vncTool, screenWidth, screenHeight } = await connectMCP();
+  const { mcp, screenWidth, screenHeight } = await connectMCP();
   const anthropic = new Anthropic();
   const systemPrompt = loadPrompt('claude');
 
-  // Combine VNC tool + custom tools
-  const tools = vncTool ? [vncTool, ...CUSTOM_TOOLS] : [...CUSTOM_TOOLS];
+  // Combine MCP tools + custom tools
+  const mcpToolsResult = await mcp.listTools();
+  const mcpTools = mcpToolsResult.tools
+    .filter(t => t.name !== 'task_complete' && t.name !== 'task_failed')
+    .map(t => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.inputSchema || { type: 'object', properties: {} },
+    }));
+  const tools = [...mcpTools, ...CUSTOM_TOOLS];
 
+  log('INIT', `Tools: ${tools.map(t => t.name).join(', ')}`);
   log('INIT', `Claude: ${CLAUDE_MODEL}`);
   log('INIT', `Observer: ${OBSERVER_MODEL}${OPENROUTER_API_KEY ? '' : ' (no key — disabled)'}`);
   log('INIT', `Turns: ${MAX_TURNS}`);
@@ -166,6 +175,35 @@ async function main() {
             tool_use_id: block.id,
             content: [{ type: 'text', text: answer }],
           });
+        }
+
+        // ── Action Queue ──
+        if (block.name === 'action_queue') {
+          log('QUEUE', `${block.input.actions.length} actions`);
+
+          try {
+            const result = await mcp.callTool({
+              name: 'action_queue',
+              arguments: block.input,
+            });
+
+            const text = result.content?.[0]?.text || 'OK';
+            log('QUEUE-RESULT', text);
+
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: block.id,
+              content: [{ type: 'text', text }],
+            });
+          } catch (err) {
+            log('QUEUE-ERROR', err.message);
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: block.id,
+              content: [{ type: 'text', text: `Error: ${err.message}` }],
+              is_error: true,
+            });
+          }
         }
 
         // ── Direct VNC ──

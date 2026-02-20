@@ -22,7 +22,7 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { vncCommandTool, controlTools } from './tools/index.js';
+import { vncCommandTool, actionQueueTool, controlTools } from './tools/index.js';
 
 // ── Configuration ───────────────────────────────────────────
 
@@ -230,6 +230,23 @@ async function executeVncCommand(input) {
   return { content };
 }
 
+async function executeActionQueue(input) {
+  const results = [];
+  for (let i = 0; i < input.actions.length; i++) {
+    const { action, ...params } = input.actions[i];
+    const response = await sendRequest(action, params);
+
+    if (response.error) {
+      results.push(`[${i + 1}] ${action}: ERROR — ${response.error.message}`);
+      break;
+    }
+
+    const detail = response.result?.detail;
+    results.push(`[${i + 1}] ${action}: ${detail || 'OK'}`);
+  }
+  return { content: [{ type: 'text', text: results.join('\n') }] };
+}
+
 // ── MCP Server ──────────────────────────────────────────────
 
 async function main() {
@@ -256,6 +273,20 @@ async function main() {
     async (input) => {
       try {
         return await executeVncCommand(input);
+      } catch (err) {
+        return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
+      }
+    },
+  );
+
+  // Register action_queue tool
+  const queueTool = actionQueueTool(display.width, display.height);
+  mcpServer.tool(
+    queueTool.name,
+    queueTool.inputSchema,
+    async (input) => {
+      try {
+        return await executeActionQueue(input);
       } catch (err) {
         return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
       }

@@ -75,6 +75,53 @@ export function vncCommandTool(width, height) {
 }
 
 /**
+ * Build action_queue tool definition with display dimensions.
+ * Executes multiple VNC actions in sequence, returns text-only results.
+ * @param {number} width  - Scaled display width
+ * @param {number} height - Scaled display height
+ */
+export function actionQueueTool(width, height) {
+  const queueAction = z.object({
+    action: z.enum([
+      'mouse_click', 'mouse_double_click', 'mouse_move', 'hover', 'nudge',
+      'mouse_drag', 'scroll',
+      'key_tap', 'key_combo', 'key_type', 'paste',
+      'set_baseline', 'diff_check',
+      'wait',
+    ]).describe('The action to perform'),
+    x: z.number().int().min(0).max(width - 1).optional().describe('X coordinate'),
+    y: z.number().int().min(0).max(height - 1).optional().describe('Y coordinate'),
+    toX: z.number().int().min(0).max(width - 1).optional().describe('Drag target X'),
+    toY: z.number().int().min(0).max(height - 1).optional().describe('Drag target Y'),
+    dx: z.number().int().min(-50).max(50).optional().describe('Relative X offset (nudge)'),
+    dy: z.number().int().min(-50).max(50).optional().describe('Relative Y offset (nudge)'),
+    button: z.enum(['left', 'right', 'middle']).optional().describe('Mouse button'),
+    key: z.string().optional().describe('Key name or combo string (e.g. "ctrl+c")'),
+    keys: z.array(z.string()).optional().describe('Array of key names for combo'),
+    text: z.string().optional().describe('Text to type or paste'),
+    direction: z.enum(['up', 'down', 'left', 'right']).optional().describe('Scroll direction'),
+    amount: z.number().int().min(1).max(20).optional().describe('Scroll amount (default 3)'),
+    ms: z.number().int().min(50).max(10000).optional().describe('Wait duration in ms (default 500)'),
+  });
+
+  return {
+    name: 'action_queue',
+    description: [
+      'Execute multiple VNC actions in sequence. Returns text results only (no screenshots).',
+      'Stops on first error. Use for batching confident action sequences.',
+      '',
+      'Examples:',
+      '  Navigate: [click(640,91), ctrl+a, paste("url"), return]',
+      '  Scroll:   [click(640,400), pagedown, pagedown, pagedown]',
+      '  Type:     [click(300,200), key_type("hello"), tab, key_type("world")]',
+    ].join('\n'),
+    inputSchema: {
+      actions: z.array(queueAction).min(1).max(20).describe('Ordered actions to execute sequentially'),
+    },
+  };
+}
+
+/**
  * Control tools (task lifecycle).
  */
 export function controlTools() {
