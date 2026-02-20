@@ -5,7 +5,6 @@ import { log } from './log.js';
 import { takeScreenshot } from './mcp.js';
 
 const OBSERVER_PROMPT = loadPrompt('observer');
-const GROUND_PROMPT = loadPrompt('observer', 'ground_prompt');
 
 /**
  * @param {Array} messages
@@ -77,38 +76,4 @@ export async function observe(question, mcp) {
   }
 
   return response;
-}
-
-/**
- * Get exact pixel coordinates of a UI element from the observer.
- * @param {string} description - What element to find
- * @param {object} mcp
- * @param {number} screenWidth
- * @param {number} screenHeight
- * @returns {Promise<string>} Coordinates as "x,y" or error message
- */
-export async function ground(description, mcp, screenWidth, screenHeight) {
-  if (!OPENROUTER_API_KEY) {
-    return 'Error: OPENROUTER_API_KEY not set — grounding unavailable.';
-  }
-
-  const screenshot = await takeScreenshot(mcp);
-
-  const messages = [
-    {
-      role: 'user',
-      content: [
-        { type: 'image_url', image_url: { url: `data:image/png;base64,${screenshot}` } },
-        { type: 'text', text: `Screen: ${screenWidth}×${screenHeight}. Find the center of: "${description}"` },
-      ],
-    },
-  ];
-
-  const response = await callModel(messages, GROUND_PROMPT);
-
-  if (response === null) {
-    return 'Grounding unavailable (API error or rate limit).';
-  }
-
-  return response.trim();
 }

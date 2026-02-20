@@ -1,6 +1,6 @@
 # Entegrasyon Testi
 
-VNC üzerinden uçtan uca masaüstü otomasyon testi, koordinat grounding desteğiyle.
+VNC üzerinden uçtan uca masaüstü otomasyon testi.
 
 ## Akış
 
@@ -19,13 +19,8 @@ sequenceDiagram
 
     E->>V: mouse_click(845, 523)
     V-->>E: OK
-    E->>O: verify("Butona tıklandı mı?")
-    O-->>E: "Hayır, değişiklik yok"
-
-    E->>O: ground("kurulum komutunun yanındaki kopyala butonu")
-    O-->>E: "842,525"
-    E->>V: mouse_click(842, 525)
-    V-->>E: OK
+    E->>O: verify("Komut kopyalandı mı?")
+    O-->>E: "Evet, pano ikonu kopyalandı durumunda"
 
     E->>E: task_complete()
 ```

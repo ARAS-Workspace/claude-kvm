@@ -1,6 +1,6 @@
 # Integration Test
 
-End-to-end desktop automation testing over VNC with coordinate grounding.
+End-to-end desktop automation testing over VNC.
 
 ## Flow
 
@@ -19,13 +19,8 @@ sequenceDiagram
 
     E->>V: mouse_click(845, 523)
     V-->>E: OK
-    E->>O: verify("Was the button clicked?")
-    O-->>E: "No, nothing changed"
-
-    E->>O: ground("copy button next to install command")
-    O-->>E: "842,525"
-    E->>V: mouse_click(842, 525)
-    V-->>E: OK
+    E->>O: verify("Was the command copied?")
+    O-->>E: "Yes, clipboard icon shows copied state"
 
     E->>E: task_complete()
 ```

@@ -39,7 +39,7 @@ import {
 import { loadPrompt } from './lib/config.js';
 import { log, saveScreenshot } from './lib/log.js';
 import { connectMCP, takeScreenshot } from './lib/mcp.js';
-import { observe, ground } from './lib/observer.js';
+import { observe } from './lib/observer.js';
 
 // ── Tool Definitions ─────────────────────────────────────
 
@@ -52,18 +52,6 @@ const VERIFY_TOOL = {
       question: { type: 'string', description: 'What to check on the screen' },
     },
     required: ['question'],
-  },
-};
-
-const GROUND_TOOL = {
-  name: 'ground',
-  description: 'Get exact pixel coordinates of a UI element from the observer. Use when your clicks are not landing on the target after 2-3 failed attempts. Returns "x,y" coordinates.',
-  input_schema: {
-    type: 'object',
-    properties: {
-      element: { type: 'string', description: 'Description of the element to locate, e.g., "Skip this step button", "OK button in dialog"' },
-    },
-    required: ['element'],
   },
 };
 
@@ -117,7 +105,7 @@ async function main() {
       input_schema: t.inputSchema || { type: 'object', properties: {} },
     }));
 
-  const tools = [...mcpTools, VERIFY_TOOL, GROUND_TOOL, TASK_COMPLETE_TOOL, TASK_FAILED_TOOL];
+  const tools = [...mcpTools, VERIFY_TOOL, TASK_COMPLETE_TOOL, TASK_FAILED_TOOL];
 
   log('INIT', `MCP tools: ${mcpTools.map(t => t.name).join(', ')}`);
   log('INIT', `Executor: ${EXECUTOR_MODEL} (max ${EXECUTOR_MAX_TURNS} turns)`);
@@ -191,14 +179,6 @@ async function main() {
         toolResults.push({
           type: 'tool_result', tool_use_id: block.id,
           content: [{ type: 'text', text: answer }],
-        });
-      } else if (block.name === 'ground') {
-        log('GROUND', block.input.element);
-        const coords = await ground(block.input.element, mcp, screenWidth, screenHeight);
-        log('GROUND-RESULT', coords);
-        toolResults.push({
-          type: 'tool_result', tool_use_id: block.id,
-          content: [{ type: 'text', text: coords }],
         });
       } else if (block.name === 'action_queue') {
         log('QUEUE', `${block.input.actions.length} actions`);
