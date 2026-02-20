@@ -11,13 +11,12 @@ Wait 3 seconds for it to launch.
 
 Ignore any Welcome wizard — go straight to the address bar.
 
-1. Click the address bar at the top of Firefox
-2. Press key_tap("escape") to dismiss any dropdown
-3. Use paste("https://github.com/ARAS-Workspace/phantom-wg#quick-start")
-4. Press key_tap("return")
-5. Wait 5 seconds for the page to load
+1. key_combo("ctrl+l") to focus the address bar (selects all existing text)
+2. paste("https://github.com/ARAS-Workspace/phantom-wg#quick-start") to replace
+3. key_tap("return")
+4. Wait 5 seconds for the page to load
 
-All 5 actions can go in a single action_queue.
+All 4 actions can go in a single action_queue.
 
 ## Step 3 — Copy the install command
 
@@ -35,7 +34,7 @@ The clipboard already has the command from step 3.
 
 1. Right-click inside the terminal window
 2. Click "Paste" from the context menu
-3. Press key_tap("return") to run
+3. key_tap("return") to run
 
 ## Step 6 — Done
 
@@ -45,7 +44,6 @@ Wait for the installation output, then call task_complete().
 
 - Use action_queue to batch multiple actions in one turn
 - Use verify() after each step to confirm it worked
-- Use paste() for all text input — never key_type
-- Only key_tap for single keys: return, escape, tab, space, pagedown
-- No key_combo — no ctrl+anything, no alt+anything
+- key_combo for modifiers: ctrl+l (address bar), ctrl+a (select all), ctrl+c (copy)
+- paste() for text input in browsers/editors — NOT in terminals
 - Terminal paste: right-click → Paste (paste() action does NOT work in terminals)
