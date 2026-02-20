@@ -5,12 +5,12 @@ import { log } from './log.js';
 import { takeScreenshot } from './mcp.js';
 
 const OBSERVER_PROMPT = loadPrompt('observer');
+const GROUND_PROMPT = loadPrompt('observer', 'ground_prompt');
 
 /**
- * Call a model via OpenRouter. Returns null on error (fail-safe).
- * @param {Array} messages - Conversation messages
- * @param {string} systemPrompt - System prompt
- * @returns {Promise<string|null>} Model response text, or null on error
+ * @param {Array} messages
+ * @param {string} systemPrompt
+ * @returns {Promise<string|null>}
  */
 async function callModel(messages, systemPrompt) {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -47,11 +47,10 @@ async function callModel(messages, systemPrompt) {
 }
 
 /**
- * Observe the screen and answer a question using the observer model.
- * Takes one screenshot, makes one API call, returns text.
- * @param {string} question - What to check on the screen
- * @param {object} mcp - MCP client
- * @returns {Promise<string>} Text answer or error message
+ * Observe the screen and answer a question.
+ * @param {string} question
+ * @param {object} mcp
+ * @returns {Promise<string>}
  */
 export async function observe(question, mcp) {
   if (!OPENROUTER_API_KEY) {
@@ -78,4 +77,38 @@ export async function observe(question, mcp) {
   }
 
   return response;
+}
+
+/**
+ * Get exact pixel coordinates of a UI element from the observer.
+ * @param {string} description - What element to find
+ * @param {object} mcp
+ * @param {number} screenWidth
+ * @param {number} screenHeight
+ * @returns {Promise<string>} Coordinates as "x,y" or error message
+ */
+export async function ground(description, mcp, screenWidth, screenHeight) {
+  if (!OPENROUTER_API_KEY) {
+    return 'Error: OPENROUTER_API_KEY not set — grounding unavailable.';
+  }
+
+  const screenshot = await takeScreenshot(mcp);
+
+  const messages = [
+    {
+      role: 'user',
+      content: [
+        { type: 'image_url', image_url: { url: `data:image/png;base64,${screenshot}` } },
+        { type: 'text', text: `Screen: ${screenWidth}×${screenHeight}. Find the center of: "${description}"` },
+      ],
+    },
+  ];
+
+  const response = await callModel(messages, GROUND_PROMPT);
+
+  if (response === null) {
+    return 'Grounding unavailable (API error or rate limit).';
+  }
+
+  return response.trim();
 }

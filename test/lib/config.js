@@ -15,8 +15,8 @@ export function loadFile(name, envVar) {
   return readFileSync(resolve(testDir, name), 'utf-8').trim();
 }
 
-export function loadPrompt(agent) {
-  return readFileSync(resolve(testDir, 'agents', agent, 'system_prompt.md'), 'utf-8').trim();
+export function loadPrompt(agent, name = 'system_prompt') {
+  return readFileSync(resolve(testDir, 'agents', agent, `${name}.md`), 'utf-8').trim();
 }
 
 // API keys
@@ -24,13 +24,11 @@ export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 // Models
-export const PLANNER_MODEL = process.env.PLANNER_MODEL || 'claude-opus-4-6';
-export const EXECUTOR_MODEL = process.env.EXECUTOR_MODEL || 'claude-haiku-4-5-20251001';
+export const EXECUTOR_MODEL = process.env.EXECUTOR_MODEL || 'claude-opus-4-6';
 export const OBSERVER_MODEL = process.env.OBSERVER_MODEL || 'qwen/qwen3-vl-235b-a22b-instruct';
 
 // Turn limits
-export const PLANNER_MAX_TURNS = parseInt(process.env.PLANNER_MAX_TURNS || '15', 10);
-export const EXECUTOR_MAX_TURNS = parseInt(process.env.EXECUTOR_MAX_TURNS || '10', 10);
+export const EXECUTOR_MAX_TURNS = parseInt(process.env.EXECUTOR_MAX_TURNS || '30', 10);
 
 // Task
 export const TASK = loadFile('test_prompt.md', 'TASK');

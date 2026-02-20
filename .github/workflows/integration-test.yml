@@ -14,36 +14,23 @@ on:
       - 'test-v*'
   workflow_dispatch:
     inputs:
-      planner_model:
-        description: 'Planner model (dispatches sub-tasks)'
+      executor_model:
+        description: 'Executor model (Claude)'
         required: false
         default: 'claude-opus-4-6'
         type: choice
         options:
           - claude-opus-4-6
           - claude-sonnet-4-6
-      executor_model:
-        description: 'Executor model (VNC actions)'
-        required: false
-        default: 'claude-haiku-4-5-20251001'
-        type: choice
-        options:
-          - claude-haiku-4-5-20251001
-          - claude-sonnet-4-6
       observer_model:
-        description: 'Observer model for verify() (OpenRouter)'
+        description: 'Observer model (OpenRouter)'
         required: false
         default: 'qwen/qwen3-vl-235b-a22b-instruct'
         type: string
-      planner_max_turns:
-        description: 'Max planner turns'
-        required: false
-        default: '15'
-        type: string
       executor_max_turns:
-        description: 'Max executor turns per dispatch'
+        description: 'Max executor turns'
         required: false
-        default: '5'
+        default: '30'
         type: string
 
 env:
@@ -178,11 +165,9 @@ jobs:
           VNC_PORT: '5900'
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
           SCREENSHOTS_DIR: ./test-screenshots
-          PLANNER_MODEL: ${{ inputs.planner_model || 'claude-opus-4-6' }}
-          EXECUTOR_MODEL: ${{ inputs.executor_model || 'claude-haiku-4-5-20251001' }}
+          EXECUTOR_MODEL: ${{ inputs.executor_model || 'claude-opus-4-6' }}
           OBSERVER_MODEL: ${{ inputs.observer_model || 'qwen/qwen3-vl-235b-a22b-instruct' }}
-          PLANNER_MAX_TURNS: ${{ inputs.planner_max_turns || '15' }}
-          EXECUTOR_MAX_TURNS: ${{ inputs.executor_max_turns || '5' }}
+          EXECUTOR_MAX_TURNS: ${{ inputs.executor_max_turns || '30' }}
         run: |
           mkdir -p test-screenshots
           node test/integration.js
@@ -193,7 +178,7 @@ jobs:
         if: always()
         run: |
           SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /tmp/do_key root@${{ steps.droplet.outputs.DROPLET_IP }}"
-          $SSH "kill -INT \$(cat /tmp/ffmpeg.pid 2>/dev/null) 2>/dev/null; sleep 3" || true
+          $SSH "kill -INT $(cat /tmp/ffmpeg.pid 2>/dev/null) 2>/dev/null; sleep 3" || true
           scp -o StrictHostKeyChecking=no -i /tmp/do_key \
             root@${{ steps.droplet.outputs.DROPLET_IP }}:/tmp/recording.mp4 \
             ./test-screenshots/recording.mp4 2>/dev/null || echo "No recording file"
