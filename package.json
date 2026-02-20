@@ -1,6 +1,6 @@
 {
   "name": "claude-kvm",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server — control remote desktops via VNC (MacOS)",
   "license": "MIT",
   "author": "Rıza Emre ARAS <r.emrearas@proton.me>",
