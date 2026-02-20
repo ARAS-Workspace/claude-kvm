@@ -2,52 +2,6 @@
 
 Hierarchical agent architecture for end-to-end desktop automation testing over VNC.
 
-## Architecture
-
-```mermaid
-graph TB
-    subgraph Planner["Opus · Planner"]
-        P["Task Decomposition<br/><i>Dispatches sub-tasks</i>"]
-    end
-
-    subgraph Executor["Haiku · Executor"]
-        direction TB
-        E["UI Execution<br/><i>Fresh context per dispatch</i>"]
-        VNC_Tools["VNC Actions<br/><i>click · paste · scroll · queue</i>"]
-        E --> VNC_Tools
-    end
-
-    subgraph Observer["Qwen-VL · Observer"]
-        O["Screen Verification<br/><i>Independent vision model</i>"]
-    end
-
-    subgraph MCP["claude-kvm · MCP"]
-        D["Daemon<br/><i>VNC Client</i>"]
-    end
-
-    subgraph Target["Remote Desktop"]
-        Desktop["XFCE · 1280x720<br/><i>Xvfb + x11vnc</i>"]
-    end
-
-    P -->|"dispatch(instruction)"| E
-    E -->|"report(status, summary)"| P
-    E -->|"verify(question)"| O
-    O -->|"text answer"| E
-    VNC_Tools -->|"vnc_command / action_queue"| D
-    D -->|"screenshot / result"| VNC_Tools
-    D <-->|"RFB Protocol"| Desktop
-
-    classDef planner fill:#1a1a2e,stroke:#533483,color:#e5e5e5
-    classDef executor fill:#0f3460,stroke:#16213e,color:#e5e5e5
-    classDef observer fill:#1a1a2e,stroke:#e94560,color:#e5e5e5
-    classDef mcp fill:#16213e,stroke:#0f3460,color:#e5e5e5
-
-    class P planner
-    class E,VNC_Tools executor
-    class O observer
-    class D mcp
-```
-
 ## Flow
 
 ```mermaid
@@ -82,61 +36,47 @@ sequenceDiagram
     P->>P: task_complete()
 ```
 
-## Structure
+## Directory
 
 ```
 test/
-├── integration.js              # Main — planner loop + dispatch
-├── test_prompt.md              # Task description
+├── integration.js
+├── test_prompt.md
 ├── lib/
-│   ├── config.js               # All configuration (env-driven)
-│   ├── executor.js             # Executor loop (fresh context per dispatch)
-│   ├── observer.js             # Observer API (OpenRouter)
-│   ├── mcp.js                  # MCP connection + screenshot
-│   └── log.js                  # Logging + screenshot save
+│   ├── config.js
+│   ├── executor.js
+│   ├── observer.js
+│   ├── mcp.js
+│   └── log.js
 └── agents/
     ├── planner/
-    │   └── system_prompt.md    # Opus — task planning rules
+    │   └── system_prompt.md
     ├── executor/
-    │   └── system_prompt.md    # Haiku — VNC technical rules
+    │   └── system_prompt.md
     └── observer/
-        └── system_prompt.md    # Qwen-VL — screen description
+        └── system_prompt.md
 ```
 
 ## Quick Start
 
 ```bash
 cp .env.example .env
-# Fill in ANTHROPIC_API_KEY and OPENROUTER_API_KEY
-```
-
-Ensure a VNC server is accessible at `VNC_HOST:VNC_PORT`, then:
-
-```bash
 npm ci
 node test/integration.js
 ```
 
 ## Configuration
 
-| Variable | Default | Description |
-|---|---|---|
-| `PLANNER_MODEL` | `claude-opus-4-6` | Planner model |
-| `EXECUTOR_MODEL` | `claude-haiku-4-5-20251001` | Executor model |
-| `OBSERVER_MODEL` | `qwen/qwen3-vl-235b-a22b-instruct` | Observer model (OpenRouter) |
-| `PLANNER_MAX_TURNS` | `15` | Max planner turns |
-| `EXECUTOR_MAX_TURNS` | `5` | Max executor turns per dispatch |
-| `VNC_HOST` | `127.0.0.1` | VNC server host |
-| `VNC_PORT` | `5900` | VNC server port |
-| `SCREENSHOTS_DIR` | `./test-screenshots` | Screenshot output directory |
-
-## CI
-
-Push a `test-v*` tag to trigger the GitHub Actions workflow. It provisions a DigitalOcean droplet with Xvfb + XFCE + x11vnc, runs the test via SSH tunnel, and uploads artifacts.
-
-```bash
-git tag test-v0.3 && git push origin main test-v0.3
-```
+| Variable             | Default                            |
+|----------------------|------------------------------------|
+| `PLANNER_MODEL`      | `claude-opus-4-6`                  |
+| `EXECUTOR_MODEL`     | `claude-haiku-4-5-20251001`        |
+| `OBSERVER_MODEL`     | `qwen/qwen3-vl-235b-a22b-instruct` |
+| `PLANNER_MAX_TURNS`  | `15`                               |
+| `EXECUTOR_MAX_TURNS` | `5`                                |
+| `VNC_HOST`           | `127.0.0.1`                        |
+| `VNC_PORT`           | `5900`                             |
+| `SCREENSHOTS_DIR`    | `./test-screenshots`               |
 
 ---
 

@@ -1,143 +1,83 @@
 # Entegrasyon Testi
 
-VNC uzerinden uctan uca masaustu otomasyon testi icin hiyerarsik ajan mimarisi.
+VNC üzerinden uçtan uca masaüstü otomasyon testi için hiyerarşik ajan mimarisi.
 
-## Mimari
-
-```mermaid
-graph TB
-    subgraph Planner["Opus · Planlayici"]
-        P["Gorev Ayristirma<br/><i>Alt gorevleri dagitir</i>"]
-    end
-
-    subgraph Executor["Haiku · Yurutucu"]
-        direction TB
-        E["UI Yurutme<br/><i>Her dispatch icin taze context</i>"]
-        VNC_Tools["VNC Aksiyonlari<br/><i>click · paste · scroll · queue</i>"]
-        E --> VNC_Tools
-    end
-
-    subgraph Observer["Qwen-VL · Gozlemci"]
-        O["Ekran Dogrulama<br/><i>Bagimsiz gorsel model</i>"]
-    end
-
-    subgraph MCP["claude-kvm · MCP"]
-        D["Daemon<br/><i>VNC Client</i>"]
-    end
-
-    subgraph Target["Uzak Masaustu"]
-        Desktop["XFCE · 1280x720<br/><i>Xvfb + x11vnc</i>"]
-    end
-
-    P -->|"dispatch(talimat)"| E
-    E -->|"report(durum, ozet)"| P
-    E -->|"verify(soru)"| O
-    O -->|"metin yanit"| E
-    VNC_Tools -->|"vnc_command / action_queue"| D
-    D -->|"screenshot / sonuc"| VNC_Tools
-    D <-->|"RFB Protokolu"| Desktop
-
-    classDef planner fill:#1a1a2e,stroke:#533483,color:#e5e5e5
-    classDef executor fill:#0f3460,stroke:#16213e,color:#e5e5e5
-    classDef observer fill:#1a1a2e,stroke:#e94560,color:#e5e5e5
-    classDef mcp fill:#16213e,stroke:#0f3460,color:#e5e5e5
-
-    class P planner
-    class E,VNC_Tools executor
-    class O observer
-    class D mcp
-```
-
-## Akis
+## Akış
 
 ```mermaid
 sequenceDiagram
-    participant P as Opus (Planlayici)
-    participant E as Haiku (Yurutucu)
-    participant O as Qwen-VL (Gozlemci)
+    participant P as Opus (Planlayıcı)
+    participant E as Haiku (Yürütücü)
+    participant O as Qwen-VL (Gözlemci)
     participant V as VNC Daemon
 
-    P->>E: dispatch("Firefox'u ac, URL'ye git")
+    P->>E: dispatch("Firefox'u aç, URL'ye git")
     activate E
     E->>V: screenshot
-    V-->>E: gorsel
+    V-->>E: görsel
     E->>V: action_queue([click, paste, enter, wait, escape, click])
     V-->>E: OK x6
-    E->>O: verify("Sayfa yuklendi mi?")
-    O-->>E: "Evet, GitHub sayfasi gorunuyor"
-    E-->>P: [success] Sayfa yuklendi
+    E->>O: verify("Sayfa yüklendi mi?")
+    O-->>E: "Evet, GitHub sayfası görünüyor"
+    E-->>P: [success] Sayfa yüklendi
     deactivate E
 
-    P->>E: dispatch("Kurulum komutunun yanindaki kopyala ikonuna tikla")
+    P->>E: dispatch("Kurulum komutunun yanındaki kopyala ikonuna tıkla")
     activate E
     E->>V: screenshot
-    V-->>E: gorsel
+    V-->>E: görsel
     E->>V: mouse_click(845, 523)
     V-->>E: OK
-    E->>O: verify("Komut kopyalandi mi?")
-    O-->>E: "Evet, pano ikonu kopyalandi durumunda"
-    E-->>P: [success] Komut kopyalandi
+    E->>O: verify("Komut kopyalandı mı?")
+    O-->>E: "Evet, pano ikonu kopyalandı durumunda"
+    E-->>P: [success] Komut kopyalandı
     deactivate E
 
     P->>P: task_complete()
 ```
 
-## Yapi
+## Dizin Hiyerarşisi
 
 ```
 test/
-├── integration.js              # Ana dosya — planlayici dongusu + dispatch
-├── test_prompt.md              # Gorev tanimi
+├── integration.js
+├── test_prompt.md
 ├── lib/
-│   ├── config.js               # Tum yapilandirma (env-tabanli)
-│   ├── executor.js             # Yurutucu dongusu (dispatch basina taze context)
-│   ├── observer.js             # Gozlemci API (OpenRouter)
-│   ├── mcp.js                  # MCP baglantisi + screenshot
-│   └── log.js                  # Loglama + screenshot kaydetme
+│   ├── config.js
+│   ├── executor.js
+│   ├── observer.js
+│   ├── mcp.js
+│   └── log.js
 └── agents/
     ├── planner/
-    │   └── system_prompt.md    # Opus — gorev planlama kurallari
+    │   └── system_prompt.md
     ├── executor/
-    │   └── system_prompt.md    # Haiku — VNC teknik kurallari
+    │   └── system_prompt.md
     └── observer/
-        └── system_prompt.md    # Qwen-VL — ekran betimleme
+        └── system_prompt.md
 ```
 
-## Hizli Baslangic
+## Hızlı Başlangıç
 
 ```bash
 cp .env.example .env
-# ANTHROPIC_API_KEY ve OPENROUTER_API_KEY degerlerini girin
-```
-
-`VNC_HOST:VNC_PORT` adresinde erisilebilir bir VNC sunucusu oldugundan emin olun:
-
-```bash
 npm ci
 node test/integration.js
 ```
 
-## Yapilandirma
+## Konfigürasyon
 
-| Degisken | Varsayilan | Aciklama |
-|---|---|---|
-| `PLANNER_MODEL` | `claude-opus-4-6` | Planlayici modeli |
-| `EXECUTOR_MODEL` | `claude-haiku-4-5-20251001` | Yurutucu modeli |
-| `OBSERVER_MODEL` | `qwen/qwen3-vl-235b-a22b-instruct` | Gozlemci modeli (OpenRouter) |
-| `PLANNER_MAX_TURNS` | `15` | Maks planlayici tur sayisi |
-| `EXECUTOR_MAX_TURNS` | `5` | Dispatch basina maks yurutucu turu |
-| `VNC_HOST` | `127.0.0.1` | VNC sunucu adresi |
-| `VNC_PORT` | `5900` | VNC sunucu portu |
-| `SCREENSHOTS_DIR` | `./test-screenshots` | Screenshot cikti dizini |
-
-## CI
-
-`test-v*` tag'i push'layarak GitHub Actions is akisini tetikleyin. DigitalOcean uzerinde Xvfb + XFCE + x11vnc ile bir droplet olusturur, SSH tuneli uzerinden testi calistirir ve ciktilari yukler.
-
-```bash
-git tag test-v0.3 && git push origin main test-v0.3
-```
+| Değişken             | Varsayılan                         |
+|----------------------|------------------------------------|
+| `PLANNER_MODEL`      | `claude-opus-4-6`                  |
+| `EXECUTOR_MODEL`     | `claude-haiku-4-5-20251001`        |
+| `OBSERVER_MODEL`     | `qwen/qwen3-vl-235b-a22b-instruct` |
+| `PLANNER_MAX_TURNS`  | `15`                               |
+| `EXECUTOR_MAX_TURNS` | `5`                                |
+| `VNC_HOST`           | `127.0.0.1`                        |
+| `VNC_PORT`           | `5900`                             |
+| `SCREENSHOTS_DIR`    | `./test-screenshots`               |
 
 ---
 
-Copyright (c) 2026 Riza Emre ARAS — MIT License
+Copyright (c) 2026 Rıza Emre ARAS — MIT License
