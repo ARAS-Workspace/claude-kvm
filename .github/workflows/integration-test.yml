@@ -11,7 +11,7 @@ name: Integration Test
 on:
   push:
     tags:
-      - 'e2e-test-v*'
+      - 'test-v*'
   workflow_dispatch:
     inputs:
       claude_model:
