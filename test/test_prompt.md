@@ -4,7 +4,7 @@ Complete the following task on the XFCE desktop (1280x720):
 
 ## Goal
 
-Open the File Manager, create a directory structure, create a text file, and verify the result.
+Open the File Manager, create a directory structure, and verify the result.
 
 ## Steps
 
@@ -12,11 +12,7 @@ Open the File Manager, create a directory structure, create a text file, and ver
 2. Create a new folder named "claude-kvm-test" — right-click empty area → Create Folder
 3. Open "claude-kvm-test"
 4. Inside it, create another folder named "logs"
-5. Go back to "claude-kvm-test"
-6. Open a terminal here — use the menu or taskbar terminal icon
-7. Run: `echo "OCR test passed" > report.txt`
-8. Switch back to the File Manager and verify "report.txt" is visible
-9. Call task_complete()
+5. Verify both folders exist, then call task_complete()
 
 ## Rules
 

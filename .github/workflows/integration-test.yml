@@ -178,7 +178,7 @@ jobs:
         if: always()
         run: |
           SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /tmp/do_key root@${{ steps.droplet.outputs.DROPLET_IP }}"
-          $SSH "kill -INT $(cat /tmp/ffmpeg.pid 2>/dev/null) 2>/dev/null; sleep 3" || true
+          $SSH 'kill -INT $(cat /tmp/ffmpeg.pid 2>/dev/null) 2>/dev/null; sleep 3' || true
           scp -o StrictHostKeyChecking=no -i /tmp/do_key \
             root@${{ steps.droplet.outputs.DROPLET_IP }}:/tmp/recording.mp4 \
             ./test-screenshots/recording.mp4 2>/dev/null || echo "No recording file"
