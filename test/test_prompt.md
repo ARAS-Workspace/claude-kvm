@@ -1,50 +1,25 @@
-# Phantom-WG Installation Task
+# File Manager Task
 
 Complete the following task on the XFCE desktop (1280x720):
 
-## Step 1 — Open Firefox
+## Goal
 
-Click the Firefox icon in the bottom taskbar (globe/fox icon, near center of the panel).
-Wait 3 seconds for it to launch.
+Open the File Manager, create a directory structure, create a text file, and verify the result.
 
-## Step 2 — Navigate to URL
+## Steps
 
-Ignore any Welcome wizard — go straight to the address bar.
-
-1. key_combo("ctrl+l") to focus the address bar (selects all existing text)
-2. paste("https://github.com/ARAS-Workspace/phantom-wg#quick-start") to replace
-3. key_tap("return")
-4. Wait 5 seconds for the page to load
-
-All 4 actions can go in a single action_queue.
-
-## Step 3 — Copy the install command
-
-Find the install command: `curl -sSL https://install.phantom.tc | bash`
-Use detect_elements to locate text on the page. Click the copy icon (clipboard button) next to the code block.
-
-## Step 4 — Open terminal
-
-Click the terminal icon in the bottom taskbar (black icon with "$" symbol).
-Wait 2 seconds for it to open.
-
-## Step 5 — Paste and run
-
-The clipboard already has the command from step 3.
-
-1. Right-click inside the terminal window
-2. Click "Paste" from the context menu
-3. key_tap("return") to run
-
-## Step 6 — Done
-
-Wait for the installation output, then call task_complete().
+1. Open the File Manager (Thunar) — double-click the "Home" icon on the desktop or find it in the taskbar
+2. Create a new folder named "claude-kvm-test" — right-click empty area → Create Folder
+3. Open "claude-kvm-test"
+4. Inside it, create another folder named "logs"
+5. Go back to "claude-kvm-test"
+6. Open a terminal here — use the menu or taskbar terminal icon
+7. Run: `echo "OCR test passed" > report.txt`
+8. Switch back to the File Manager and verify "report.txt" is visible
+9. Call task_complete()
 
 ## Rules
 
-- Use action_queue to batch multiple actions in one turn
-- Use verify() after each step to confirm it worked
-- Use detect_elements to find text and get precise click coordinates
-- key_combo for modifiers: ctrl+l (address bar), ctrl+a (select all), ctrl+c (copy)
-- paste() for text input in browsers/editors — NOT in terminals
-- Terminal paste: right-click → Paste (paste() action does NOT work in terminals)
+- Use detect_elements to find menu items and file/folder names before clicking
+- Use action_queue to batch actions
+- Use verify() after key steps
