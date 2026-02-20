@@ -55,47 +55,7 @@ jobs:
         run: |
           gh api "repos/${{ github.repository }}/actions/runs/${{ env.RUN_ID }}/logs" > logs.zip
           unzip -o logs.zip -d logs/
-
-          # ── Find step log files ──
-          REC_LOG=$(find logs/ -iname "*screen recording*" | head -1)
-          TEST_LOG=$(grep -rl '\[TEST\] Starting' logs/ | head -1)
-
-          if [ -z "$TEST_LOG" ]; then
-            echo "Error: Could not find test log"; exit 1
-          fi
-          echo "Recording step: $REC_LOG"
-          echo "Test step: $TEST_LOG"
-
-          # ── Extract test log lines ──
-          grep -oP '\[\d{2}:\d{2}:\d{2}\] \[[A-Z][-A-Z]*\] .+' "$TEST_LOG" > test-logs.txt
-          echo "Log lines: $(wc -l < test-logs.txt)"
-
-          # ── ISO timestamps for sync ──
-          # Recording start: "Screen recording started" line
-          REC_ISO=$(grep "Screen recording started" "$REC_LOG" | tail -1 | grep -oP '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
-          echo "Recording started (ISO): $REC_ISO"
-
-          # Test start: first [INIT] line
-          TEST_START_ISO=$(grep -m1 '\[INIT\]' "$TEST_LOG" | grep -oP '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
-          echo "Test started (ISO): $TEST_START_ISO"
-
-          # Test end: last [TEST] PASSED/FAILED line
-          TEST_END_ISO=$(grep '\[TEST\].*PASSED\|FAILED' "$TEST_LOG" | tail -1 | grep -oP '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
-          echo "Test ended (ISO): $TEST_END_ISO"
-
-          # ── Compute offset and duration (seconds) ──
-          REC_S=$(date -d "$REC_ISO" +%s)
-          START_S=$(date -d "$TEST_START_ISO" +%s)
-          END_S=$(date -d "$TEST_END_ISO" +%s)
-
-          OFFSET=$((START_S - REC_S))
-          DURATION=$((END_S - START_S))
-          [ $OFFSET -lt 0 ] && OFFSET=0
-          [ $DURATION -lt 1 ] && DURATION=1
-
-          echo "OFFSET=${OFFSET}s  DURATION=${DURATION}s"
-          echo "OFFSET=$OFFSET" >> $GITHUB_OUTPUT
-          echo "DURATION=$DURATION" >> $GITHUB_OUTPUT
+          node scripts/parse-ci-logs.js logs/ >> $GITHUB_OUTPUT
 
       # ── Generate Cast + GIF ─────────────────────────────
 
