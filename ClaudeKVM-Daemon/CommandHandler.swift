@@ -180,6 +180,27 @@ extension ClaudeKVMDaemon {
                 try await input.pasteText(text)
                 respond(.success(id: id, detail: "OK"))
 
+            // ── Detection ──────────────────────────────────────
+
+            case "detect_elements":
+                let elements = vnc.withFramebuffer { buf, w, h -> [TextElement] in
+                    detectTextElements(buffer: buf, width: w, height: h, scaling: scaling)
+                } ?? []
+                respond(.success(id: id, detail: "\(elements.count) elements",
+                                  scaledWidth: scaling.scaledWidth, scaledHeight: scaling.scaledHeight,
+                                  elements: elements))
+
+            // ── Configuration ─────────────────────────────────
+
+            case "configure":
+                handleConfigure(id: id, params: p, input: input, scaling: scaling)
+
+            case "get_timing":
+                let timing = buildTimingMap(input: input, scaling: scaling)
+                respond(.success(id: id,
+                                  scaledWidth: scaling.scaledWidth, scaledHeight: scaling.scaledHeight,
+                                  timing: timing))
+
             // ── Control ───────────────────────────────────────
 
             case "wait":
@@ -202,6 +223,159 @@ extension ClaudeKVMDaemon {
         } catch {
             respond(.error(id: id, message: error.localizedDescription))
         }
+    }
+
+    // MARK: - Configure Handler
+
+    private func handleConfigure(
+        id: PCId?,
+        params p: PCRequest.Params?,
+        input: InputController,
+        scaling: DisplayScaling
+    ) {
+        if p?.reset == true {
+            input.timing = InputTiming()
+            let timing = buildTimingMap(input: input, scaling: scaling)
+            respond(.success(id: id, detail: "OK — reset to defaults",
+                              scaledWidth: scaling.scaledWidth, scaledHeight: scaling.scaledHeight,
+                              timing: timing))
+            return
+        }
+
+        var changed: [String] = []
+
+        // Display
+        if let v = p?.maxDimension {
+            scaling.reconfigure(maxDimension: v)
+            Self.maxImageDimension = v
+            changed.append("max_dimension")
+        }
+
+        // Mouse
+        if let v = p?.clickHoldMs {
+            input.timing.clickHoldUs = UInt32(v) * 1000
+            changed.append("click_hold_ms")
+        }
+        if let v = p?.doubleClickGapMs {
+            input.timing.doubleClickGapUs = UInt32(v) * 1000
+            changed.append("double_click_gap_ms")
+        }
+        if let v = p?.hoverSettleMs {
+            input.timing.hoverSettleUs = UInt32(v) * 1000
+            changed.append("hover_settle_ms")
+        }
+
+        // Drag
+        if let v = p?.dragPositionMs {
+            input.timing.dragPositionUs = UInt32(v) * 1000
+            changed.append("drag_position_ms")
+        }
+        if let v = p?.dragPressMs {
+            input.timing.dragPressUs = UInt32(v) * 1000
+            changed.append("drag_press_ms")
+        }
+        if let v = p?.dragStepMs {
+            input.timing.dragStepUs = UInt32(v) * 1000
+            changed.append("drag_step_ms")
+        }
+        if let v = p?.dragSettleMs {
+            input.timing.dragSettleUs = UInt32(v) * 1000
+            changed.append("drag_settle_ms")
+        }
+        if let v = p?.dragPixelsPerStep {
+            input.timing.dragPixelsPerStep = v
+            changed.append("drag_pixels_per_step")
+        }
+        if let v = p?.dragMinSteps {
+            input.timing.dragMinSteps = v
+            changed.append("drag_min_steps")
+        }
+
+        // Scroll
+        if let v = p?.scrollPressMs {
+            input.timing.scrollPressUs = UInt32(v) * 1000
+            changed.append("scroll_press_ms")
+        }
+        if let v = p?.scrollTickMs {
+            input.timing.scrollTickUs = UInt32(v) * 1000
+            changed.append("scroll_tick_ms")
+        }
+
+        // Keyboard
+        if let v = p?.keyHoldMs {
+            input.timing.keyHoldUs = UInt32(v) * 1000
+            changed.append("key_hold_ms")
+        }
+        if let v = p?.comboModMs {
+            input.timing.comboModUs = UInt32(v) * 1000
+            changed.append("combo_mod_ms")
+        }
+
+        // Typing
+        if let v = p?.typeKeyMs {
+            input.timing.typeKeyUs = UInt32(v) * 1000
+            changed.append("type_key_ms")
+        }
+        if let v = p?.typeInterKeyMs {
+            input.timing.typeInterKeyUs = UInt32(v) * 1000
+            changed.append("type_inter_key_ms")
+        }
+        if let v = p?.typeShiftMs {
+            input.timing.typeShiftUs = UInt32(v) * 1000
+            changed.append("type_shift_ms")
+        }
+        if let v = p?.pasteSettleMs {
+            input.timing.pasteSettleUs = UInt32(v) * 1000
+            changed.append("paste_settle_ms")
+        }
+
+        // Display tuning
+        if let v = p?.cursorCropRadius {
+            input.timing.cursorCropRadius = v
+            changed.append("cursor_crop_radius")
+        }
+
+        if changed.isEmpty {
+            respond(.error(id: id, message: "No valid parameters provided"))
+            return
+        }
+
+        log("configure: \(changed.joined(separator: ", "))")
+
+        if changed.contains("max_dimension") {
+            log("Display rescaled: \(scaling.scaledWidth)×\(scaling.scaledHeight)")
+            respond(.success(id: id, detail: "OK — changed: \(changed.joined(separator: ", "))",
+                              scaledWidth: scaling.scaledWidth, scaledHeight: scaling.scaledHeight))
+        } else {
+            respond(.success(id: id, detail: "OK — changed: \(changed.joined(separator: ", "))"))
+        }
+    }
+
+    // MARK: - Timing Map Builder
+
+    private func buildTimingMap(input: InputController, scaling: DisplayScaling) -> [String: Double] {
+        let t = input.timing
+        return [
+            "max_dimension": Double(scaling.maxDimension),
+            "click_hold_ms": Double(t.clickHoldUs) / 1000,
+            "double_click_gap_ms": Double(t.doubleClickGapUs) / 1000,
+            "hover_settle_ms": Double(t.hoverSettleUs) / 1000,
+            "drag_position_ms": Double(t.dragPositionUs) / 1000,
+            "drag_press_ms": Double(t.dragPressUs) / 1000,
+            "drag_step_ms": Double(t.dragStepUs) / 1000,
+            "drag_settle_ms": Double(t.dragSettleUs) / 1000,
+            "drag_pixels_per_step": t.dragPixelsPerStep,
+            "drag_min_steps": Double(t.dragMinSteps),
+            "scroll_press_ms": Double(t.scrollPressUs) / 1000,
+            "scroll_tick_ms": Double(t.scrollTickUs) / 1000,
+            "key_hold_ms": Double(t.keyHoldUs) / 1000,
+            "combo_mod_ms": Double(t.comboModUs) / 1000,
+            "type_key_ms": Double(t.typeKeyUs) / 1000,
+            "type_inter_key_ms": Double(t.typeInterKeyUs) / 1000,
+            "type_shift_ms": Double(t.typeShiftUs) / 1000,
+            "paste_settle_ms": Double(t.pasteSettleUs) / 1000,
+            "cursor_crop_radius": Double(t.cursorCropRadius),
+        ]
     }
 
     // MARK: - Helpers

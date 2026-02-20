@@ -1,5 +1,24 @@
 import Foundation
 
+/// Detected text element from OCR with bounding box in scaled coordinates.
+struct TextElement: Encodable {
+    let text: String
+    let elX: Int
+    let elY: Int
+    let elW: Int
+    let elH: Int
+    let confidence: Double
+
+    enum CodingKeys: String, CodingKey {
+        case text
+        case elX = "x"
+        case elY = "y"
+        case elW = "w"
+        case elH = "h"
+        case confidence
+    }
+}
+
 /// PC (Procedure Call) response over stdout NDJSON.
 /// {"result":{"detail":"OK"},"id":1}
 struct PCResponse: Encodable {
@@ -14,6 +33,8 @@ struct PCResponse: Encodable {
         var y: Int?
         var scaledWidth: Int?
         var scaledHeight: Int?
+        var timing: [String: Double]?
+        var elements: [TextElement]?
     }
 
     struct ErrorPayload: Encodable {
@@ -28,12 +49,15 @@ struct PCResponse: Encodable {
         x: Int? = nil,
         y: Int? = nil,
         scaledWidth: Int? = nil,
-        scaledHeight: Int? = nil
+        scaledHeight: Int? = nil,
+        timing: [String: Double]? = nil,
+        elements: [TextElement]? = nil
     ) -> PCResponse {
         PCResponse(
             result: ResultPayload(
                 detail: detail, image: image, x: x, y: y,
-                scaledWidth: scaledWidth, scaledHeight: scaledHeight
+                scaledWidth: scaledWidth, scaledHeight: scaledHeight,
+                timing: timing, elements: elements
             ),
             error: nil, id: id
         )
@@ -44,7 +68,7 @@ struct PCResponse: Encodable {
     }
 }
 
-/// PC (Procedure Call) notification — no id, server→caller.
+/// PC (Procedure Call) notification — no id, server->caller.
 /// {"method":"vnc_state","params":{"state":"connected"}}
 struct PCNotification: Encodable {
     let method: String

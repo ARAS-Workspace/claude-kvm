@@ -8,6 +8,7 @@ struct PCRequest: Decodable {
     let id: PCId?
 
     struct Params: Decodable {
+        // Action parameters
         let x: Int?
         let y: Int?
         let toX: Int?
@@ -21,6 +22,55 @@ struct PCRequest: Decodable {
         let direction: String?
         let amount: Int?
         let ms: Int?
+
+        // Configure — timing (ms) + display
+        let reset: Bool?
+        let maxDimension: Int?
+        let clickHoldMs: Int?
+        let doubleClickGapMs: Int?
+        let hoverSettleMs: Int?
+        let dragPositionMs: Int?
+        let dragPressMs: Int?
+        let dragStepMs: Int?
+        let dragSettleMs: Int?
+        let dragPixelsPerStep: Double?
+        let dragMinSteps: Int?
+        let scrollPressMs: Int?
+        let scrollTickMs: Int?
+        let keyHoldMs: Int?
+        let comboModMs: Int?
+        let typeKeyMs: Int?
+        let typeInterKeyMs: Int?
+        let typeShiftMs: Int?
+        let pasteSettleMs: Int?
+        let cursorCropRadius: Int?
+
+        // swiftlint:disable nesting
+        enum CodingKeys: String, CodingKey {
+            case x, y, toX, toY, dx, dy
+            case button, key, keys, text, direction, amount, ms
+            case reset
+            case maxDimension = "max_dimension"
+            case clickHoldMs = "click_hold_ms"
+            case doubleClickGapMs = "double_click_gap_ms"
+            case hoverSettleMs = "hover_settle_ms"
+            case dragPositionMs = "drag_position_ms"
+            case dragPressMs = "drag_press_ms"
+            case dragStepMs = "drag_step_ms"
+            case dragSettleMs = "drag_settle_ms"
+            case dragPixelsPerStep = "drag_pixels_per_step"
+            case dragMinSteps = "drag_min_steps"
+            case scrollPressMs = "scroll_press_ms"
+            case scrollTickMs = "scroll_tick_ms"
+            case keyHoldMs = "key_hold_ms"
+            case comboModMs = "combo_mod_ms"
+            case typeKeyMs = "type_key_ms"
+            case typeInterKeyMs = "type_inter_key_ms"
+            case typeShiftMs = "type_shift_ms"
+            case pasteSettleMs = "paste_settle_ms"
+            case cursorCropRadius = "cursor_crop_radius"
+        }
+        // swiftlint:enable nesting
     }
 }
 

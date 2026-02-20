@@ -2,7 +2,7 @@ name: Claude-KVM-Daemon
 options:
   bundleIdPrefix: com.remrearas.claude-kvm-daemon
   deploymentTarget:
-    macOS: "14.0"
+    macOS: "15.0"
   xcodeVersion: "16.0"
 
 packages:
@@ -23,19 +23,19 @@ targets:
       base:
         ARCHS: arm64
         SWIFT_VERSION: "5.9"
-        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        MACOSX_DEPLOYMENT_TARGET: "15.0"
         OTHER_SWIFT_FLAGS: "-parse-as-library"
         SWIFT_INCLUDE_PATHS: "$(SRCROOT)/vendor/libvnc/prebuilt"
         LIBRARY_SEARCH_PATHS:
           - "$(SRCROOT)/vendor/libvnc/prebuilt"
-          - "/opt/homebrew/opt/openssl@3/lib"
         HEADER_SEARCH_PATHS: "$(SRCROOT)/vendor/libvnc/prebuilt/include"
         OTHER_LDFLAGS:
           - "-lvncclient"
           - "-lz"
-          - "-lssl"
-          - "-lcrypto"
           - "-lpthread"
+          - "/opt/homebrew/opt/openssl@3/lib/libssl.a"
+          - "/opt/homebrew/opt/openssl@3/lib/libcrypto.a"
+          - "-Wl,-w"
       configs:
         Release:
           SWIFT_OPTIMIZATION_LEVEL: -O
@@ -45,6 +45,3 @@ schemes:
     build:
       targets:
         claude-kvm-daemon: all
-    run:
-      commandLineArguments:
-        "--host 192.168.65.2 --port 5900 --username phantom --password phantom-wg -v": true
