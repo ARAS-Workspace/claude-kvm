@@ -21,7 +21,7 @@ All 4 actions can go in a single action_queue.
 ## Step 3 — Copy the install command
 
 Find the install command: `curl -sSL https://install.phantom.tc | bash`
-Click the copy icon (clipboard button) next to the code block.
+Use detect_elements to locate text on the page. Click the copy icon (clipboard button) next to the code block.
 
 ## Step 4 — Open terminal
 
@@ -44,6 +44,7 @@ Wait for the installation output, then call task_complete().
 
 - Use action_queue to batch multiple actions in one turn
 - Use verify() after each step to confirm it worked
+- Use detect_elements to find text and get precise click coordinates
 - key_combo for modifiers: ctrl+l (address bar), ctrl+a (select all), ctrl+c (copy)
 - paste() for text input in browsers/editors — NOT in terminals
 - Terminal paste: right-click → Paste (paste() action does NOT work in terminals)

@@ -200,7 +200,7 @@ async function executeVncCommand(input) {
     };
   }
 
-  const { detail, image, x, y, scaledWidth, scaledHeight } = response.result || {};
+  const { detail, image, x, y, scaledWidth, scaledHeight, elements, timing } = response.result || {};
   const content = [];
 
   // Text detail
@@ -213,12 +213,22 @@ async function executeVncCommand(input) {
     content.push({ type: 'image', data: image, mimeType: 'image/png' });
   }
 
+  // OCR elements (detect_elements)
+  if (elements) {
+    content.push({ type: 'text', text: JSON.stringify(elements) });
+  }
+
+  // Timing map (get_timing, configure with reset)
+  if (timing) {
+    content.push({ type: 'text', text: JSON.stringify(timing) });
+  }
+
   // Cursor position (nudge, cursor_crop)
   if (x !== undefined && y !== undefined) {
     content.push({ type: 'text', text: `cursor: (${x}, ${y})` });
   }
 
-  // Display dimensions (health — no image)
+  // Display dimensions (health, detect_elements, get_timing — no image)
   if (scaledWidth !== undefined && !image) {
     content.push({ type: 'text', text: `display: ${scaledWidth}×${scaledHeight}` });
   }
