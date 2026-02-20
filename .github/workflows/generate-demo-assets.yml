@@ -145,3 +145,22 @@ jobs:
             demo-screen.mp4
             ${{ github.ref_name }}.mp4
             ${{ github.ref_name }}.gif
+
+      # ── Push to main ───────────────────────────────────────
+
+      - name: Push assets to main
+        run: |
+          TAG="${{ github.ref_name }}"
+          git fetch origin main
+          git checkout main
+
+          mkdir -p test/assets
+          cp demo.cast demo-terminal.gif demo-terminal.mp4 \
+             demo-screen.mp4 "${TAG}.mp4" "${TAG}.gif" \
+             test/assets/
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add test/assets/
+          git commit -m "Add demo assets from ${TAG}"
+          git push origin main
