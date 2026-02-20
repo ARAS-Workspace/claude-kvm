@@ -16,6 +16,6 @@ Open the File Manager, create a directory structure, and verify the result.
 
 ## Rules
 
-- Use detect_elements to find menu items and file/folder names before clicking
+- Use detect_elements (not screenshot) to find clickable targets
+- Use key_type to enter folder names in dialogs (paste doesn't work in GTK dialogs)
 - Use action_queue to batch actions
-- Use verify() after key steps

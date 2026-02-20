@@ -113,6 +113,18 @@ async function main() {
   log('INIT', `Display: ${screenWidth}×${screenHeight}`);
   log('INIT', `Task: ${TASK.slice(0, 120)}...`);
 
+  // Wake up screen (screensaver/blank screen protection)
+  log('INIT', 'Waking up screen...');
+  try {
+    await mcp.callTool({ name: 'action_queue', arguments: { actions: [
+      { action: 'mouse_click', x: 640, y: 360 },
+      { action: 'key_tap', key: 'space' },
+      { action: 'wait', ms: 2000 },
+    ]}});
+  } catch (err) {
+    log('INIT', `Wake-up failed (non-fatal): ${err.message}`);
+  }
+
   // Initial screenshot + detect_elements
   const screenshot = await takeScreenshot(mcp);
   let elementsText = '';
