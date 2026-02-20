@@ -1,0 +1,160 @@
+# SPDX-License-Identifier: MIT
+# Claude KVM — Demo Asset Generator
+#
+# Extracts logs + screen recording from a CI test run,
+# generates asciinema cast, terminal GIF/MP4, screen MP4,
+# and a composite split-screen video.
+#
+# Usage: update RUN_ID and SPEED below, then tag press-kit-assets-*
+
+name: Generate Demo Assets
+
+on:
+  push:
+    tags:
+      - 'press-kit-assets-*'
+
+env:
+  TZ: Europe/Istanbul
+
+  # ── Configuration ─────────────────────────────────────
+  # Integration test run: https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22242573195
+  RUN_ID: '22242573195'
+  SPEED: '4'
+
+# ─────────────────────────────────────────────────────────────
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # ── Extract Logs ────────────────────────────────────
+
+      - name: Download test artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run download ${{ env.RUN_ID }} \
+            -n test-artifacts -D ./artifacts
+          ls -lh artifacts/
+
+      - name: Extract test logs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/actions/runs/${{ env.RUN_ID }}/logs" > logs.zip
+          unzip -o logs.zip -d logs/
+
+          LOGFILE=$(grep -rl '\[TEST\] Starting' logs/ | head -1)
+          if [ -z "$LOGFILE" ]; then
+            echo "Error: Could not find test log in run"
+            exit 1
+          fi
+          echo "Log file: $LOGFILE"
+
+          grep -oP '\[\d{2}:\d{2}:\d{2}\] \[[A-Z][-A-Z]*\] .+' "$LOGFILE" > test-logs.txt
+          echo "Log lines: $(wc -l < test-logs.txt)"
+          head -5 test-logs.txt
+          echo "---"
+          tail -3 test-logs.txt
+
+      # ── Generate Cast + GIF ─────────────────────────────
+
+      - name: Generate asciinema cast
+        run: |
+          cat test-logs.txt | node scripts/logs-to-cast.js "${{ env.SPEED }}" > demo.cast
+          echo "Cast lines: $(wc -l < demo.cast)"
+
+      - name: Build agg image
+        run: |
+          git clone --depth 1 https://github.com/asciinema/agg /tmp/agg
+          docker build -t agg /tmp/agg
+
+      - name: Render terminal GIF
+        run: |
+          docker run --rm -v "$PWD:/data" agg \
+            --font-size 14 --theme solarized-dark \
+            /data/demo.cast /data/demo-terminal.gif
+          ls -lh demo-terminal.gif
+
+      # ── Generate Videos ─────────────────────────────────
+
+      - name: Build terminal MP4
+        run: |
+          ffmpeg -y -i demo-terminal.gif \
+            -c:v libx264 -crf 18 -preset slow \
+            -pix_fmt yuv420p -r 30 \
+            -movflags +faststart \
+            demo-terminal.mp4
+          ls -lh demo-terminal.mp4
+
+      - name: Build screen MP4 (trimmed + speed)
+        run: |
+          # Test duration from log timestamps
+          FIRST_TS=$(head -1 test-logs.txt | grep -oP '\d{2}:\d{2}:\d{2}')
+          LAST_TS=$(tail -1 test-logs.txt | grep -oP '\d{2}:\d{2}:\d{2}')
+
+          IFS=: read fh fm fs <<< "$FIRST_TS"
+          IFS=: read lh lm ls <<< "$LAST_TS"
+          first_s=$((10#$fh*3600 + 10#$fm*60 + 10#$fs))
+          last_s=$((10#$lh*3600 + 10#$lm*60 + 10#$ls))
+          TEST_DURATION=$((last_s - first_s))
+          [ $TEST_DURATION -lt 0 ] && TEST_DURATION=$((TEST_DURATION + 86400))
+          echo "Test duration: ${TEST_DURATION}s"
+
+          REC_DURATION=$(ffprobe -v error -show_entries format=duration \
+            -of csv=p=0 artifacts/recording.mp4 | cut -d. -f1)
+          echo "Recording duration: ${REC_DURATION}s"
+
+          OFFSET=$((REC_DURATION - TEST_DURATION))
+          [ $OFFSET -lt 0 ] && OFFSET=0
+          echo "Trim offset: ${OFFSET}s"
+
+          PTS=$(echo "scale=4; 1/${{ env.SPEED }}" | bc)
+          echo "PTS factor: $PTS"
+
+          ffmpeg -y -ss "$OFFSET" -t "$TEST_DURATION" -i artifacts/recording.mp4 \
+            -filter:v "setpts=${PTS}*PTS" \
+            -an -c:v libx264 -crf 18 -preset slow \
+            -pix_fmt yuv420p \
+            demo-screen.mp4
+          ls -lh demo-screen.mp4
+
+      - name: Build composite (split-screen)
+        run: |
+          ffmpeg -y -i demo-terminal.mp4 -i demo-screen.mp4 \
+            -filter_complex "
+              [0:v]scale=-2:720[left];
+              [1:v]scale=-2:720[right];
+              [left][right]hstack=inputs=2
+            " \
+            -c:v libx264 -crf 18 -preset slow \
+            -pix_fmt yuv420p -movflags +faststart \
+            -shortest \
+            demo-composite.mp4
+
+          echo "=== Output files ==="
+          ls -lh demo-*.mp4 demo-*.gif demo.cast
+
+      # ── Upload ──────────────────────────────────────────
+
+      - name: Upload demo assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-assets
+          path: |
+            demo.cast
+            demo-terminal.gif
+            demo-terminal.mp4
+            demo-screen.mp4
+            demo-composite.mp4

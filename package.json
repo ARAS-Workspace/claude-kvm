@@ -1,0 +1,9 @@
+{
+  "name": "claude-kvm-press-kit",
+  "description": "Claude KVM - Press Kit",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^22.19.11"
+  }
+}
