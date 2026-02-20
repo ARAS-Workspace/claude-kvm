@@ -57,7 +57,7 @@ jobs:
           unzip -o logs.zip -d logs/
 
           # ── Find step log files ──
-          REC_LOG=$(find logs/ -name "*screen recording*" -o -name "*Screen recording*" | head -1)
+          REC_LOG=$(find logs/ -iname "*screen recording*" | head -1)
           TEST_LOG=$(grep -rl '\[TEST\] Starting' logs/ | head -1)
 
           if [ -z "$TEST_LOG" ]; then
