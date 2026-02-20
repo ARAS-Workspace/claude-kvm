@@ -3,8 +3,8 @@
 Complete the following task on the XFCE desktop (1280x720):
 
 1. Open Firefox from the bottom taskbar.
-2. Navigate to https://github.com/ARAS-Workspace/phantom-wg
-3. Scroll down the README page to find the install command (`curl -sSL https://install.phantom.tc | bash`). Use pagedown and verify after each scroll to check if the install section is visible.
+2. Navigate to https://github.com/ARAS-Workspace/phantom-wg — after the page loads, press escape and click on the page body to dismiss the address bar dropdown.
+3. Scroll down to find the install command (`curl -sSL https://install.phantom.tc | bash`). Before scrolling: click on an empty area of the page (not the address bar). Then use pagedown. After each scroll, verify if the install section is visible.
 4. Click the copy icon (clipboard button) next to the install command to copy it.
 5. Open a terminal from the bottom taskbar.
 6. Paste the copied command into the terminal and run it.
