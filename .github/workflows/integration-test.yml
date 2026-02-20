@@ -30,7 +30,7 @@ on:
       max_turns:
         description: 'Max Claude turns'
         required: false
-        default: '25'
+        default: '50'
         type: string
 
 env:
@@ -167,7 +167,7 @@ jobs:
           SCREENSHOTS_DIR: ./test-screenshots
           CLAUDE_MODEL: ${{ inputs.claude_model || 'claude-opus-4-6' }}
           OBSERVER_MODEL: ${{ inputs.observer_model || 'qwen/qwen3-vl-235b-a22b-instruct' }}
-          MAX_TURNS: ${{ inputs.max_turns || '25' }}
+          MAX_TURNS: ${{ inputs.max_turns || '50' }}
         run: |
           mkdir -p test-screenshots
           node test/integration.js
