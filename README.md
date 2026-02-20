@@ -24,6 +24,7 @@ graph TB
 
         subgraph Screen["Screen"]
             Capture["Frame Capture<br/><i>PNG · Crop · Diff</i>"]
+            OCR["OCR Detection<br/><i>Apple Vision</i>"]
         end
 
         subgraph InputGroup["Input"]
@@ -90,17 +91,18 @@ Scaled:  1280 x 779   (what Claude sees and targets)
 mouse_click(640, 400) → VNC receives (2110, 1284)
 ```
 
-### Three-Layer Screen Strategy
+### Screen Strategy
 
 Claude minimizes token cost with a progressive verification approach:
 
 ```
-diff_check  →  changeDetected: true/false     ~5ms   (text only, no image)
-cursor_crop →  crop around cursor             ~50ms  (small image)
-screenshot  →  full screen capture            ~200ms (full image)
+diff_check       →  changeDetected: true/false     ~5ms    (text only, no image)
+detect_elements  →  OCR text + bounding boxes      ~50ms   (text only, no image)
+cursor_crop      →  crop around cursor              ~50ms   (small image)
+screenshot       →  full screen capture             ~200ms  (full image)
 ```
 
-Start cheap, escalate only when needed.
+`detect_elements` uses Apple Vision framework for on-device OCR. Returns text content with bounding box coordinates in scaled space — enables precise click targeting without consuming vision tokens.
 
 ---
 
@@ -121,7 +123,7 @@ brew install claude-kvm-daemon
 > [!NOTE]
 > `claude-kvm-daemon` is compiled and code-signed via CI (GitHub Actions). The build output is packaged in two formats: a `.tar.gz` archive for Homebrew distribution and a `.dmg` disk image for notarization. The DMG is submitted to Apple servers for notarization within the same workflow — the process can be tracked from CI logs. The notarized DMG is available as a CI Artifact; the archived `.tar.gz` is also published as a release on the repository. Homebrew installation tracks this release.
 >
-> - [Release](https://github.com/ARAS-Workspace/claude-kvm/releases/tag/daemon-v1.0.0) · [Build Workflow](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22148745112) · [Source Code](https://github.com/ARAS-Workspace/claude-kvm/tree/daemon-tool)
+> - [Release](https://github.com/ARAS-Workspace/claude-kvm/releases/tag/daemon-v1.0.1) · [Source Code](https://github.com/ARAS-Workspace/claude-kvm/tree/daemon-tool)
 > - [LibVNC Build](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22122975416) · [LibVNC Branch](https://github.com/ARAS-Workspace/claude-kvm/tree/libvnc-build)
 > - [Homebrew Tap](https://github.com/ARAS-Workspace/homebrew-tap)
 
@@ -141,7 +143,7 @@ Create a `.mcp.json` file in your project directory:
         "VNC_USERNAME": "user",
         "VNC_PASSWORD": "pass",
         "CLAUDE_KVM_DAEMON_PATH": "/opt/homebrew/bin/claude-kvm-daemon",
-        "CLAUDE_KVM_DAEMON_PARAMETERS": "--max-dimension 1280 -v"
+        "CLAUDE_KVM_DAEMON_PARAMETERS": "-v"
       }
     }
   }
@@ -166,12 +168,8 @@ Create a `.mcp.json` file in your project directory:
 Additional arguments passed to the daemon via `CLAUDE_KVM_DAEMON_PARAMETERS`:
 
 ```
-"CLAUDE_KVM_DAEMON_PARAMETERS": "--max-dimension 800 --click-hold-ms 80 --key-hold-ms 50 -v"
+"CLAUDE_KVM_DAEMON_PARAMETERS": "--max-dimension 800 -v"
 ```
-
-All timing defaults are defined in the [`InputTiming`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/KeySymbols.swift) struct.
-
-**General:** [`main.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/main.swift) · [`DisplayScaling.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/DisplayScaling.swift) · [`VNCBridge.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/VNC/VNCBridge.swift)
 
 | Parameter           | Default | Description                            |
 |---------------------|---------|----------------------------------------|
@@ -181,53 +179,63 @@ All timing defaults are defined in the [`InputTiming`](https://github.com/ARAS-W
 | `--no-reconnect`    |         | Disable automatic reconnection         |
 | `-v, --verbose`     |         | Verbose logging (stderr)               |
 
-**Mouse timing:** [`MouseClick.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/MouseClick.swift) · [`MouseMovement.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/MouseMovement.swift)
+#### Runtime Configuration (PC)
 
-| Parameter               | Default | Description                |
-|-------------------------|---------|----------------------------|
-| `--click-hold-ms`       | `50`    | Click hold duration        |
-| `--double-click-gap-ms` | `50`    | Double-click gap delay     |
-| `--hover-settle-ms`     | `400`   | Hover settle wait duration |
+All timing and display parameters are configurable at runtime via the `configure` method. Use `get_timing` to inspect current values.
 
-**Drag timing:** [`MouseDrag.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/MouseDrag.swift)
+Set timing:
+```json
+{"method":"configure","params":{"click_hold_ms":80,"key_hold_ms":50}}
+```
+```json
+{"result":{"detail":"OK — changed: click_hold_ms, key_hold_ms"}}
+```
 
-| Parameter                | Default | Description                            |
-|--------------------------|---------|----------------------------------------|
-| `--drag-position-ms`     | `30`    | Pre-drag position wait                 |
-| `--drag-press-ms`        | `50`    | Drag press hold threshold              |
-| `--drag-step-ms`         | `5`     | Delay between interpolation points     |
-| `--drag-settle-ms`       | `30`    | Settle wait before release             |
-| `--drag-pixels-per-step` | `20`    | Point density per pixel                |
-| `--drag-min-steps`       | `10`    | Minimum interpolation steps            |
+Change display scaling:
+```json
+{"method":"configure","params":{"max_dimension":960}}
+```
+```json
+{"result":{"detail":"OK — changed: max_dimension","scaledWidth":960,"scaledHeight":584}}
+```
 
-**Scroll timing:** [`Scroll.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/Scroll.swift)
+Reset to defaults:
+```json
+{"method":"configure","params":{"reset":true}}
+```
+```json
+{"result":{"detail":"OK — reset to defaults","timing":{"click_hold_ms":50,"combo_mod_ms":10,"cursor_crop_radius":150,"double_click_gap_ms":50,"drag_min_steps":10,"drag_pixels_per_step":20,"drag_position_ms":30,"drag_press_ms":50,"drag_settle_ms":30,"drag_step_ms":5,"hover_settle_ms":400,"key_hold_ms":30,"max_dimension":1280,"paste_settle_ms":30,"scroll_press_ms":10,"scroll_tick_ms":20,"type_inter_key_ms":20,"type_key_ms":20,"type_shift_ms":10},"scaledWidth":1280,"scaledHeight":779}}
+```
 
-| Parameter           | Default | Description                     |
-|---------------------|---------|---------------------------------|
-| `--scroll-press-ms` | `10`    | Scroll press-release gap        |
-| `--scroll-tick-ms`  | `20`    | Delay between ticks             |
+Get current values:
+```json
+{"method":"get_timing"}
+```
+```json
+{"result":{"timing":{"click_hold_ms":80,"combo_mod_ms":10,"cursor_crop_radius":150,"double_click_gap_ms":50,"drag_min_steps":10,"drag_pixels_per_step":20,"drag_position_ms":30,"drag_press_ms":50,"drag_settle_ms":30,"drag_step_ms":5,"hover_settle_ms":400,"key_hold_ms":50,"max_dimension":1280,"paste_settle_ms":30,"scroll_press_ms":10,"scroll_tick_ms":20,"type_inter_key_ms":20,"type_key_ms":20,"type_shift_ms":10},"scaledWidth":1280,"scaledHeight":779}}
+```
 
-**Keyboard timing:** [`KeyPress.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/KeyPress.swift)
-
-| Parameter        | Default | Description                  |
-|------------------|---------|------------------------------|
-| `--key-hold-ms`  | `30`    | Key hold duration            |
-| `--combo-mod-ms` | `10`    | Modifier key settle delay    |
-
-**Typing timing:** [`TextInput.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/Input/TextInput.swift)
-
-| Parameter             | Default | Description                    |
-|-----------------------|---------|--------------------------------|
-| `--type-key-ms`       | `20`    | Key hold during typing         |
-| `--type-inter-key-ms` | `20`    | Inter-character delay          |
-| `--type-shift-ms`     | `10`    | Shift key settle duration      |
-| `--paste-settle-ms`   | `30`    | Post-clipboard write wait      |
-
-**Image:** [`FrameCapture.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/FrameCapture.swift) · [`CommandHandler.swift`](https://github.com/ARAS-Workspace/claude-kvm/blob/daemon-tool/ClaudeKVM-Daemon/CommandHandler.swift)
-
-| Parameter              | Default | Description             |
-|------------------------|---------|-------------------------|
-| `--cursor-crop-radius` | `150`   | Cursor crop radius (px) |
+| Parameter              | Default | Description                |
+|------------------------|---------|----------------------------|
+| `max_dimension`        | `1280`  | Max screenshot dimension   |
+| `cursor_crop_radius`   | `150`   | Cursor crop radius (px)    |
+| `click_hold_ms`        | `50`    | Click hold duration        |
+| `double_click_gap_ms`  | `50`    | Double-click gap delay     |
+| `hover_settle_ms`      | `400`   | Hover settle wait          |
+| `drag_position_ms`     | `30`    | Pre-drag position wait     |
+| `drag_press_ms`        | `50`    | Drag press hold threshold  |
+| `drag_step_ms`         | `5`     | Between interpolation pts  |
+| `drag_settle_ms`       | `30`    | Settle before release      |
+| `drag_pixels_per_step` | `20`    | Point density per pixel    |
+| `drag_min_steps`       | `10`    | Min interpolation steps    |
+| `scroll_press_ms`      | `10`    | Scroll press-release gap   |
+| `scroll_tick_ms`       | `20`    | Inter-tick delay           |
+| `key_hold_ms`          | `30`    | Key hold duration          |
+| `combo_mod_ms`         | `10`    | Modifier settle delay      |
+| `type_key_ms`          | `20`    | Key hold during typing     |
+| `type_inter_key_ms`    | `20`    | Inter-character delay      |
+| `type_shift_ms`        | `10`    | Shift key settle           |
+| `paste_settle_ms`      | `30`    | Post-clipboard write wait  |
 
 ---
 
@@ -264,6 +272,29 @@ All operations are performed through a single `vnc_command` tool:
 | `key_combo` | `key` or `keys`   | Modifier combo ("cmd+c" or ["cmd","shift","3"])              |
 | `key_type`  | `text`            | Type text character by character                             |
 | `paste`     | `text`            | Paste text via clipboard                                     |
+
+### Detection
+
+| Action            | Parameters | Description                                           |
+|-------------------|------------|-------------------------------------------------------|
+| `detect_elements` |            | OCR text detection with bounding boxes (Apple Vision) |
+
+Returns text elements with bounding box coordinates in scaled space:
+
+```json
+{"method":"detect_elements"}
+```
+```json
+{"result":{"detail":"13 elements","elements":[{"confidence":1,"h":9,"text":"Finder","w":32,"x":37,"y":6},{"confidence":1,"h":9,"text":"File","w":15,"x":84,"y":6},{"confidence":1,"h":9,"text":"Edit","w":19,"x":112,"y":6},{"confidence":1,"h":9,"text":"View","w":22,"x":143,"y":6},{"confidence":1,"h":11,"text":"Go","w":15,"x":179,"y":6},{"confidence":1,"h":9,"text":"Window","w":35,"x":207,"y":6},{"confidence":1,"h":11,"text":"Help","w":22,"x":255,"y":6},{"confidence":1,"h":11,"text":"8•","w":26,"x":1161,"y":6},{"confidence":1,"h":9,"text":"Fri Feb 20 22:19","w":80,"x":1189,"y":6},{"confidence":1,"h":9,"text":"Assets","w":32,"x":1202,"y":97},{"confidence":1,"h":9,"text":"Passwords.kdbx","w":74,"x":1181,"y":168},{"confidence":1,"h":93,"text":"PHANTOM","w":633,"x":322,"y":477},{"confidence":1,"h":32,"text":"YOUR SERVER, YOUR NETWORK, YOUR PRIVACY","w":629,"x":325,"y":568}],"scaledHeight":717,"scaledWidth":1280}}
+```
+
+### Configuration
+
+| Action       | Parameters      | Description                          |
+|--------------|-----------------|--------------------------------------|
+| `configure`  | `{<params>}`    | Set timing/display params at runtime |
+| `configure`  | `{reset: true}` | Reset all params to defaults         |
+| `get_timing` |                 | Get current timing + display params  |
 
 ### Control
 
