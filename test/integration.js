@@ -113,15 +113,27 @@ async function main() {
   log('INIT', `Display: ${screenWidth}×${screenHeight}`);
   log('INIT', `Task: ${TASK.slice(0, 120)}...`);
 
-  // Initial screenshot
+  // Initial screenshot + detect_elements
   const screenshot = await takeScreenshot(mcp);
+  let elementsText = '';
+  try {
+    const elemResult = await mcp.callTool({ name: 'vnc_command', arguments: { action: 'detect_elements' } });
+    for (const item of elemResult.content) {
+      if (item.type === 'text' && item.text.startsWith('[')) {
+        elementsText = item.text;
+        log('OCR', `${JSON.parse(item.text).length} elements detected`);
+      }
+    }
+  } catch (err) {
+    log('OCR', `detect_elements failed: ${err.message}`);
+  }
 
   /** @type {import('@anthropic-ai/sdk').MessageParam[]} */
   const messages = [{
     role: 'user',
     content: [
       { type: 'image', source: { type: 'base64', media_type: 'image/png', data: screenshot } },
-      { type: 'text', text: TASK },
+      { type: 'text', text: `## Screen Elements (OCR)\n\`\`\`json\n${elementsText}\n\`\`\`\n\n${TASK}` },
     ],
   }];
 
