@@ -2,13 +2,12 @@
 
 Complete the following task on the XFCE desktop (1280x720):
 
-1. Open Firefox from the bottom taskbar.
-2. Navigate to https://github.com/ARAS-Workspace/phantom-wg — after the page loads, press escape and click on the page body to dismiss the address bar dropdown.
-3. Scroll down to find the install command (`curl -sSL https://install.phantom.tc | bash`). Before scrolling: click on an empty area of the page (not the address bar). Then use pagedown. After each scroll, verify if the install section is visible.
-4. Click the copy icon (clipboard button) next to the install command to copy it.
-5. Open a terminal from the bottom taskbar.
-6. Paste the copied command into the terminal and run it.
-7. Wait for the installation to complete, then mark the task as done.
+1. Open Firefox from the bottom taskbar. If you see a Welcome wizard, click "Skip this step" to dismiss it.
+2. Navigate to https://github.com/ARAS-Workspace/phantom-wg#quick-start — this links directly to the install section.
+3. Find the install command (`curl -sSL https://install.phantom.tc | bash`) and click the copy icon (clipboard button) next to it.
+4. Open a terminal from the bottom taskbar.
+5. Paste the copied command into the terminal and run it.
+6. Wait for the installation to complete, then mark the task as done.
 
 ## How to Interact
 
@@ -18,7 +17,6 @@ You are a basic user. You don't know keyboard shortcuts. You interact like this:
 - **Look** where your cursor is using cursor_crop before and after clicking.
 - **Type** text using the `paste` action — it puts text directly into most apps (browsers, text editors).
 - **Press Enter** using key_tap("return") to confirm.
-- **Scroll** pages using key_tap("pagedown") or scroll with amount 15. Click the page body first to give it focus.
 - **Copy/Paste**: Right-click → select "Copy" or "Paste" from the context menu. Never use Ctrl+C/V/X or any modifier combos.
 - **Verify** each step worked using verify() before moving on.
 

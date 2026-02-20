@@ -138,7 +138,7 @@ return, escape, tab, space, backspace, delete, pagedown, pageup, home, end, up, 
 - For terminal text input, always use the right-click Paste method.
 - Prefer verify() over screenshot — keeps context clean.
 - Scroll with amount 15 or pagedown — never small scroll amounts.
-- Firefox first launch shows a Welcome wizard — dismiss it or skip past it.
+- **Firefox Welcome wizard**: First launch shows a setup wizard. Click "Skip this step" link to dismiss it immediately. Do NOT try to navigate while the wizard is showing — dismiss it first, then use the address bar.
 - If a page has language buttons (TR/EN) or "Continue" buttons, click them to proceed.
 - **NEVER click the address bar unless you intend to type a URL.** Clicking it opens the dropdown which steals focus.
 - **After EVERY navigation**: escape → click page body. This is mandatory, not optional.
