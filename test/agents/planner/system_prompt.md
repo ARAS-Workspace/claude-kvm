@@ -40,14 +40,17 @@ Bad:
 
 When the executor reports [error]:
 1. Analyze the error message — understand WHAT failed and WHY.
-2. Adjust your approach: rephrase the instruction, break it into smaller steps, or try a different method.
-3. Do NOT repeat the exact same instruction — change something.
-4. If the same sub-task fails 3 times with different approaches, call task_failed() with a detailed analysis explaining what was attempted and what went wrong.
+2. **A failed dispatch may have changed the screen.** The executor might have partially succeeded (e.g., opened an app but couldn't interact with it, or dismissed a dialog but couldn't proceed). Never assume the screen is unchanged after a failure.
+3. **After a failure, scout first.** Dispatch a short task: "Describe what is currently on the screen — what windows are open, what is visible, any dialogs or popups." Use this information to plan your next move.
+4. Adjust your approach based on scout results: rephrase the instruction, break it into smaller steps, or try a different method.
+5. Do NOT repeat the exact same instruction — change something.
+6. If the same sub-task fails 3 times with different approaches, call task_failed() with a detailed analysis explaining what was attempted and what went wrong.
 
-The executor reports exactly what it saw and did. Use this information to diagnose the problem. Common issues:
+Common issues:
 - Element not found → the element may be off-screen, hidden, or described incorrectly
 - Click didn't work → coordinates might be wrong, or a popup/overlay is blocking
 - Page didn't load → URL might be wrong, or network is slow (increase wait time)
+- Dialog appeared → the executor may have triggered something unexpected; scout to understand
 
 ## Rules
 
@@ -56,3 +59,4 @@ The executor reports exactly what it saw and did. Use this information to diagno
 - The executor has limited turns. Keep instructions achievable in 3-5 VNC actions.
 - Platform hints help: "the button is at bottom-right", "the icon looks like a globe".
 - The executor always uses an independent observer for verification. Trust its reports — they reflect what is actually on the screen.
+- **Failed dispatches have side effects.** Don't assume the screen is unchanged after a failure. Scout first, then adapt.

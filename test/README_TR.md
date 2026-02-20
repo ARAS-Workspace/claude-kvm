@@ -73,7 +73,7 @@ node test/integration.js
 | `EXECUTOR_MODEL`     | `claude-haiku-4-5-20251001`        |
 | `OBSERVER_MODEL`     | `qwen/qwen3-vl-235b-a22b-instruct` |
 | `PLANNER_MAX_TURNS`  | `15`                               |
-| `EXECUTOR_MAX_TURNS` | `5`                                |
+| `EXECUTOR_MAX_TURNS` | `10`                               |
 | `VNC_HOST`           | `127.0.0.1`                        |
 | `VNC_PORT`           | `5900`                             |
 | `SCREENSHOTS_DIR`    | `./test-screenshots`               |

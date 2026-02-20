@@ -57,6 +57,17 @@ export async function executeSubTask(instruction, mcp, mcpTools) {
   }];
 
   for (let turn = 1; turn <= EXECUTOR_MAX_TURNS; turn++) {
+    // Inject last-turn warning so the model calls report() instead of wasting the turn
+    if (turn === EXECUTOR_MAX_TURNS && messages.length > 1) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.role === 'user' && Array.isArray(lastMsg.content)) {
+        lastMsg.content.push({
+          type: 'text',
+          text: 'IMPORTANT: This is your LAST turn. You MUST call report() now with what you accomplished so far.',
+        });
+      }
+    }
+
     log('EXEC', `turn ${turn}/${EXECUTOR_MAX_TURNS}`);
 
     const response = await anthropic.messages.create({

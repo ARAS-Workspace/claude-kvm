@@ -30,7 +30,7 @@ export const OBSERVER_MODEL = process.env.OBSERVER_MODEL || 'qwen/qwen3-vl-235b-
 
 // Turn limits
 export const PLANNER_MAX_TURNS = parseInt(process.env.PLANNER_MAX_TURNS || '15', 10);
-export const EXECUTOR_MAX_TURNS = parseInt(process.env.EXECUTOR_MAX_TURNS || '5', 10);
+export const EXECUTOR_MAX_TURNS = parseInt(process.env.EXECUTOR_MAX_TURNS || '10', 10);
 
 // Task
 export const TASK = loadFile('test_prompt.md', 'TASK');
