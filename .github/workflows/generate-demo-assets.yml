@@ -48,25 +48,54 @@ jobs:
             -n test-artifacts -D ./artifacts
           ls -lh artifacts/
 
-      - name: Extract test logs
+      - name: Extract logs and compute sync
+        id: sync
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh api "repos/${{ github.repository }}/actions/runs/${{ env.RUN_ID }}/logs" > logs.zip
           unzip -o logs.zip -d logs/
 
-          LOGFILE=$(grep -rl '\[TEST\] Starting' logs/ | head -1)
-          if [ -z "$LOGFILE" ]; then
-            echo "Error: Could not find test log in run"
-            exit 1
-          fi
-          echo "Log file: $LOGFILE"
+          # ── Find step log files ──
+          REC_LOG=$(find logs/ -name "*screen recording*" -o -name "*Screen recording*" | head -1)
+          TEST_LOG=$(grep -rl '\[TEST\] Starting' logs/ | head -1)
 
-          grep -oP '\[\d{2}:\d{2}:\d{2}\] \[[A-Z][-A-Z]*\] .+' "$LOGFILE" > test-logs.txt
+          if [ -z "$TEST_LOG" ]; then
+            echo "Error: Could not find test log"; exit 1
+          fi
+          echo "Recording step: $REC_LOG"
+          echo "Test step: $TEST_LOG"
+
+          # ── Extract test log lines ──
+          grep -oP '\[\d{2}:\d{2}:\d{2}\] \[[A-Z][-A-Z]*\] .+' "$TEST_LOG" > test-logs.txt
           echo "Log lines: $(wc -l < test-logs.txt)"
-          head -5 test-logs.txt
-          echo "---"
-          tail -3 test-logs.txt
+
+          # ── ISO timestamps for sync ──
+          # Recording start: "Screen recording started" line
+          REC_ISO=$(grep "Screen recording started" "$REC_LOG" | grep -oP '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
+          echo "Recording started (ISO): $REC_ISO"
+
+          # Test start: first [INIT] line
+          TEST_START_ISO=$(grep -m1 '\[INIT\]' "$TEST_LOG" | grep -oP '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
+          echo "Test started (ISO): $TEST_START_ISO"
+
+          # Test end: last [TEST] PASSED/FAILED line
+          TEST_END_ISO=$(grep '\[TEST\].*PASSED\|FAILED' "$TEST_LOG" | tail -1 | grep -oP '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
+          echo "Test ended (ISO): $TEST_END_ISO"
+
+          # ── Compute offset and duration (seconds) ──
+          REC_S=$(date -d "$REC_ISO" +%s)
+          START_S=$(date -d "$TEST_START_ISO" +%s)
+          END_S=$(date -d "$TEST_END_ISO" +%s)
+
+          OFFSET=$((START_S - REC_S))
+          DURATION=$((END_S - START_S))
+          [ $OFFSET -lt 0 ] && OFFSET=0
+          [ $DURATION -lt 1 ] && DURATION=1
+
+          echo "OFFSET=${OFFSET}s  DURATION=${DURATION}s"
+          echo "OFFSET=$OFFSET" >> $GITHUB_OUTPUT
+          echo "DURATION=$DURATION" >> $GITHUB_OUTPUT
 
       # ── Generate Cast + GIF ─────────────────────────────
 
@@ -106,30 +135,13 @@ jobs:
 
       - name: Build screen MP4 (trimmed + speed)
         run: |
-          # Test duration from log timestamps
-          FIRST_TS=$(head -1 test-logs.txt | grep -oP '\d{2}:\d{2}:\d{2}')
-          LAST_TS=$(tail -1 test-logs.txt | grep -oP '\d{2}:\d{2}:\d{2}')
-
-          IFS=: read fh fm fs <<< "$FIRST_TS"
-          IFS=: read lh lm ls <<< "$LAST_TS"
-          first_s=$((10#$fh*3600 + 10#$fm*60 + 10#$fs))
-          last_s=$((10#$lh*3600 + 10#$lm*60 + 10#$ls))
-          TEST_DURATION=$((last_s - first_s))
-          [ $TEST_DURATION -lt 0 ] && TEST_DURATION=$((TEST_DURATION + 86400))
-          echo "Test duration: ${TEST_DURATION}s"
-
-          REC_DURATION=$(ffprobe -v error -show_entries format=duration \
-            -of csv=p=0 artifacts/recording.mp4 | cut -d. -f1)
-          echo "Recording duration: ${REC_DURATION}s"
-
-          OFFSET=$((REC_DURATION - TEST_DURATION))
-          [ $OFFSET -lt 0 ] && OFFSET=0
-          echo "Trim offset: ${OFFSET}s"
-
+          OFFSET=${{ steps.sync.outputs.OFFSET }}
+          DURATION=${{ steps.sync.outputs.DURATION }}
           PTS=$(echo "scale=4; 1/${{ env.SPEED }}" | bc)
-          echo "PTS factor: $PTS"
 
-          ffmpeg -y -ss "$OFFSET" -t "$TEST_DURATION" -i artifacts/recording.mp4 \
+          echo "Offset: ${OFFSET}s  Duration: ${DURATION}s  PTS: ${PTS}"
+
+          ffmpeg -y -ss "$OFFSET" -t "$DURATION" -i artifacts/recording.mp4 \
             -filter:v "setpts=${PTS}*PTS" \
             -an -c:v libx264 -crf 18 -preset slow \
             -pix_fmt yuv420p \
