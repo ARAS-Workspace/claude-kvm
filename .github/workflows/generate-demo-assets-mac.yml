@@ -1,0 +1,169 @@
+# SPDX-License-Identifier: MIT
+# Claude KVM — Demo Asset Generator (Mac)
+#
+# Extracts logs + screen recording from a Mac CI test run,
+# generates asciinema cast, terminal GIF/MP4, screen MP4,
+# and a composite split-screen video.
+#
+# Usage: update RUN_ID and SPEED below, then tag press-kit-assets-mac-*
+
+name: Generate Demo Assets (Mac)
+
+on:
+  push:
+    tags:
+      - 'press-kit-assets-mac-*'
+
+env:
+  TZ: Europe/Istanbul
+
+  # ── Configuration ─────────────────────────────────────
+  # Mac integration test run: https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22256847542
+  RUN_ID: '22256847542'
+  SPEED: '4'
+
+# ─────────────────────────────────────────────────────────────
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # ── Extract Logs ────────────────────────────────────
+
+      - name: Download test artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run download ${{ env.RUN_ID }} \
+            -n test-artifacts-mac -D ./artifacts
+          ls -lh artifacts/
+
+      - name: Extract logs and compute sync
+        id: sync
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/actions/runs/${{ env.RUN_ID }}/logs" > logs.zip
+          unzip -o logs.zip -d logs/
+          node scripts/parse-ci-logs.js logs/ >> $GITHUB_OUTPUT
+
+      # ── Generate Cast + GIF ─────────────────────────────
+
+      - name: Generate asciinema cast
+        run: |
+          cat test-logs.txt | node scripts/logs-to-cast.js "${{ env.SPEED }}" > demo.cast
+          echo "Cast lines: $(wc -l < demo.cast)"
+
+      - name: Build agg image
+        run: |
+          git clone --depth 1 https://github.com/asciinema/agg /tmp/agg
+          docker build -t agg /tmp/agg
+
+      - name: Render terminal GIF
+        run: |
+          docker run --rm -v "$PWD:/data" agg \
+            --font-size 14 --theme solarized-dark \
+            /data/demo.cast /data/demo-terminal.gif
+          ls -lh demo-terminal.gif
+
+      # ── Generate Videos ─────────────────────────────────
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
+      - name: Build terminal MP4
+        run: |
+          ffmpeg -y -i demo-terminal.gif \
+            -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" \
+            -c:v libx264 -crf 18 -preset slow \
+            -pix_fmt yuv420p -r 30 \
+            -movflags +faststart \
+            demo-terminal.mp4
+          ls -lh demo-terminal.mp4
+
+      - name: Build screen MP4 (trimmed + speed)
+        run: |
+          OFFSET=${{ steps.sync.outputs.OFFSET }}
+          DURATION=${{ steps.sync.outputs.DURATION }}
+          PTS=$(echo "scale=4; 1/${{ env.SPEED }}" | bc)
+
+          echo "Offset: ${OFFSET}s  Duration: ${DURATION}s  PTS: ${PTS}"
+
+          ffmpeg -y -ss "$OFFSET" -t "$DURATION" -i artifacts/recording.mp4 \
+            -filter:v "setpts=${PTS}*PTS" \
+            -an -c:v libx264 -crf 18 -preset slow \
+            -pix_fmt yuv420p \
+            demo-screen.mp4
+          ls -lh demo-screen.mp4
+
+      - name: Build composite (split-screen)
+        run: |
+          TAG="${{ github.ref_name }}"
+
+          # Screen left, terminal right
+          ffmpeg -y -i demo-screen.mp4 -i demo-terminal.mp4 \
+            -filter_complex "
+              [0:v]scale=-2:720[left];
+              [1:v]scale=-2:720[right];
+              [left][right]hstack=inputs=2
+            " \
+            -c:v libx264 -crf 18 -preset slow \
+            -pix_fmt yuv420p -movflags +faststart \
+            -shortest \
+            "${TAG}.mp4"
+
+          # MP4 → GIF (high quality palette)
+          ffmpeg -y -i "${TAG}.mp4" \
+            -vf "fps=10,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
+            "${TAG}.gif"
+
+          echo "=== Output files ==="
+          ls -lh "${TAG}".* demo-*.mp4 demo-*.gif demo.cast
+
+      # ── Upload ──────────────────────────────────────────
+
+      - name: Upload demo assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.ref_name }}
+          path: |
+            demo.cast
+            demo-terminal.gif
+            demo-terminal.mp4
+            demo-screen.mp4
+            ${{ github.ref_name }}.mp4
+            ${{ github.ref_name }}.gif
+
+      # ── Push to main ───────────────────────────────────────
+
+      - name: Push assets to main
+        run: |
+          TAG="${{ github.ref_name }}"
+          git fetch origin main
+          git checkout main
+
+          mkdir -p test/assets
+          cp demo.cast demo-terminal.gif demo-terminal.mp4 \
+             demo-screen.mp4 "${TAG}.mp4" "${TAG}.gif" \
+             test/assets/
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add test/assets/
+          git commit -m "Add demo assets from ${TAG}"
+          git push origin main
