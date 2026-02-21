@@ -49,7 +49,7 @@ Screen recording and terminal logs were processed at 4x speed in the [Demo Asset
 - [Demo Asset Generation](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22245043165)
 
 > [!NOTE]
-> This flow was intentionally kept simple to make the process easy to follow. More comprehensive scenarios will be covered in separate branches — the test flow on the main branch will always remain clean and straightforward. If you'd like to see how the tool integrates into real workflows, reviewing these tests may be the most useful reference when evaluating this tool.
+> This flow was intentionally kept simple to make the process easy to follow. More comprehensive scenarios will be covered in separate branches — the test flow on the main branch will always remain clean and straightforward. If you'd like to see how the tool integrates into real workflows, reviewing these tests may be the most useful reference when evaluating this tool. That said, this document clearly outlines the end-to-end testing discipline that will be followed in all future tests.
 
 ### Artifacts
 
