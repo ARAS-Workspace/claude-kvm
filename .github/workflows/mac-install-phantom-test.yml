@@ -62,6 +62,10 @@ jobs:
 
           echo "SSH ready"
 
+      - name: Prevent display sleep
+        run: |
+          ssh -S /tmp/mac_ssh placeholder "caffeinate -d -i -s &"
+
       # ── Screen Recording ───────────────────────────────────
 
       - name: Cleanup remote recordings
