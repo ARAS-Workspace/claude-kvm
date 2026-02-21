@@ -63,7 +63,7 @@ jobs:
 
           # ffmpeg avfoundation — requires Screen Recording permission for Terminal
           $MAC_SSH "nohup ffmpeg -f avfoundation -capture_cursor 1 -framerate 10 \
-            -i '1:none' -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
+            -i '0:none' -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
             /tmp/recording.mp4 > /tmp/ffmpeg.log 2>&1 & echo \$! > /tmp/ffmpeg.pid" \
             2>/dev/null
 
