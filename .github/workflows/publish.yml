@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: MIT
-# Claude KVM — Publish (npm + MCP Registry)
+# Claude KVM — Publish (npm OIDC + MCP Registry)
 #
 # Manual trigger: version bump → npm publish (OIDC) → MCP registry update → commit & push.
-# Uses OIDC trusted publishing — no npm token needed.
 # Configure trusted publisher at: npmjs.com → Package Settings → Trusted Publishers
 
 name: Publish
@@ -21,8 +20,8 @@ on:
         default: patch
 
 permissions:
-  contents: write
   id-token: write
+  contents: write
 
 jobs:
   publish:
@@ -36,7 +35,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: npm ci
