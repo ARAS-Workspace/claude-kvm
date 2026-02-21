@@ -41,10 +41,10 @@ Aşağıdaki görsel içerikler, gerçek bir macOS masaüstü (Scaleway Mac mini
 6. Verify both folders exist, then call task_complete()
 ```
 
-Ekran kaydı ve terminal logları [Demo Asset Üretimi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22256987986) workflow'unda 4x hızlandırılarak işlenmiştir.
+Ekran kaydı ve terminal logları [Demo Asset Üretimi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22262080788) workflow'unda 4x hızlandırılarak işlenmiştir.
 
-- [Entegrasyon Testi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22256847542)
-- [Demo Asset Üretimi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22256987986)
+- [Entegrasyon Testi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261487249)
+- [Demo Asset Üretimi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22262080788)
 
 > [!NOTE]
 > Bu akış, süreci anlaşılır kılmak adına basit tutularak belirlenmiştir. Daha kapsamlı senaryolar alt branch'lerde ele alınacak olup, main branch üzerindeki test akışı her zaman temiz ve sade kalacaktır. Ürünün gerçek iş akışlarına nasıl dahil olduğunu görmek isterseniz bu testleri incelemenizi öneririm — aracı değerlendirme sürecinizde en etkili referans bu görüntüler olacaktır. Bununla birlikte, incelediğiniz bu döküman bundan sonra yapılacak testlerin uçtan uca test disiplinini açıkça ortaya koymaktadır.
@@ -52,19 +52,20 @@ Ekran kaydı ve terminal logları [Demo Asset Üretimi](https://github.com/ARAS-
 ### Artifact
 
 ```
-test/assets/mac/
+assets/test/mac/
+├── demo.cast
 ├── demo-screen.mp4
 ├── demo-terminal.gif
 ├── demo-terminal.mp4
-├── press-kit-assets-mac-22256847542.gif
-└── press-kit-assets-mac-22256847542.mp4
+├── demo-mac-run-22261487249.gif
+└── demo-mac-run-22261487249.mp4
 ```
 
-- [demo-screen.mp4](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/mac/demo-screen.mp4)
-- [demo-terminal.gif](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/mac/demo-terminal.gif)
-- [demo-terminal.mp4](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/mac/demo-terminal.mp4)
-- [press-kit-assets-mac-22256847542.gif](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/mac/press-kit-assets-mac-22256847542.gif)
-- [press-kit-assets-mac-22256847542.mp4](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/mac/press-kit-assets-mac-22256847542.mp4)
+- [demo-screen.mp4](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/mac/demo-screen.mp4)
+- [demo-terminal.gif](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/mac/demo-terminal.gif)
+- [demo-terminal.mp4](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/mac/demo-terminal.mp4)
+- [demo-mac-run-22261487249.gif](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/mac/demo-mac-run-22261487249.gif)
+- [demo-mac-run-22261487249.mp4](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/mac/demo-mac-run-22261487249.mp4)
 
 ## Dizin Hiyerarşisi
 

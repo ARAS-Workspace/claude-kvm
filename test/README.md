@@ -41,10 +41,10 @@ The visual assets below were generated from an integration test executed over VN
 6. Verify both folders exist, then call task_complete()
 ```
 
-Screen recording and terminal logs were processed at 4x speed in the [Demo Asset Generation](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22256987986) workflow.
+Screen recording and terminal logs were processed at 4x speed in the [Demo Asset Generation](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22262080788) workflow.
 
-- [Integration Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22256847542)
-- [Demo Asset Generation](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22256987986)
+- [Integration Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261487249)
+- [Demo Asset Generation](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22262080788)
 
 > [!NOTE]
 > This flow was intentionally kept simple to make the process easy to follow. More comprehensive scenarios will be covered in separate branches — the test flow on the main branch will always remain clean and straightforward. If you'd like to see how the tool integrates into real workflows, reviewing these tests may be the most useful reference when evaluating this tool. That said, this document clearly outlines the end-to-end testing discipline that will be followed in all future tests.
@@ -52,19 +52,20 @@ Screen recording and terminal logs were processed at 4x speed in the [Demo Asset
 ### Artifacts
 
 ```
-test/assets/mac/
+assets/test/mac/
+├── demo.cast
 ├── demo-screen.mp4
 ├── demo-terminal.gif
 ├── demo-terminal.mp4
-├── press-kit-assets-mac-22256847542.gif
-└── press-kit-assets-mac-22256847542.mp4
+├── demo-mac-run-22261487249.gif
+└── demo-mac-run-22261487249.mp4
 ```
 
-- [demo-screen.mp4](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/mac/demo-screen.mp4)
-- [demo-terminal.gif](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/mac/demo-terminal.gif)
-- [demo-terminal.mp4](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/mac/demo-terminal.mp4)
-- [press-kit-assets-mac-22256847542.gif](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/mac/press-kit-assets-mac-22256847542.gif)
-- [press-kit-assets-mac-22256847542.mp4](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/mac/press-kit-assets-mac-22256847542.mp4)
+- [demo-screen.mp4](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/mac/demo-screen.mp4)
+- [demo-terminal.gif](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/mac/demo-terminal.gif)
+- [demo-terminal.mp4](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/mac/demo-terminal.mp4)
+- [demo-mac-run-22261487249.gif](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/mac/demo-mac-run-22261487249.gif)
+- [demo-mac-run-22261487249.mp4](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/mac/demo-mac-run-22261487249.mp4)
 
 ## Directory
 
