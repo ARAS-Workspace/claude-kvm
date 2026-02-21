@@ -2,7 +2,7 @@
 # Claude KVM — Mac Integration Test (Scaleway Apple Silicon)
 #
 # Pre-provisioned Scaleway Mac mini M1 with native macOS + ARD/VNC.
-# SSH tunnel ensures the remote IP never appears in logs.
+# Direct connection — no SSH tunnel.
 
 name: Mac Integration Test
 
@@ -28,37 +28,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── SSH Tunnel ─────────────────────────────────────────
+      # ── SSH Setup ──────────────────────────────────────────
 
-      - name: Open SSH tunnel
+      - name: Setup SSH
         env:
           MAC_SSH_PRIVATE_KEY: ${{ secrets.MAC_SSH_PRIVATE_KEY }}
           MAC_HOST: ${{ secrets.MAC_HOST }}
-          MAC_VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
           MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
         run: |
-          # Mask host IP in logs
           echo "::add-mask::$MAC_HOST"
 
-          # Write SSH key (printf preserves newlines)
           mkdir -p ~/.ssh
           printf '%s\n' "$MAC_SSH_PRIVATE_KEY" > /tmp/mac_key
           chmod 600 /tmp/mac_key
 
-          # Open tunnel with control socket
+          # Set up control socket for screen recording steps
           ssh -fN \
-            -L 5901:localhost:${MAC_VNC_PORT:-5900} \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             -o LogLevel=ERROR \
-            -o ExitOnForwardFailure=yes \
             -o ControlPath=/tmp/mac_ssh \
             -o ControlMaster=yes \
             -o ControlPersist=yes \
             -i /tmp/mac_key \
             "${MAC_VNC_USERNAME}@${MAC_HOST}"
 
-          echo "Tunnel ready — localhost:5901"
+          echo "SSH ready"
 
       # ── Screen Recording ───────────────────────────────────
 
@@ -104,13 +99,14 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: 127.0.0.1
-          VNC_PORT: '5901'
+          VNC_HOST: ${{ secrets.MAC_HOST }}
+          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
           SCREENSHOTS_DIR: ./test-screenshots
         run: |
+          echo "::add-mask::$VNC_HOST"
           mkdir -p test-screenshots
           node test/integration.js
 
@@ -131,7 +127,7 @@ jobs:
             ./test-screenshots/recording.mov 2>/dev/null || \
           echo "No recording file"
 
-      - name: Close tunnel
+      - name: Close SSH
         if: always()
         run: |
           ssh -S /tmp/mac_ssh -O exit placeholder 2>/dev/null || true
