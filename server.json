@@ -1,0 +1,55 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ARAS-Workspace/claude-kvm",
+  "description": "MCP server — control remote desktops via VNC with a native Swift daemon and Apple Vision OCR",
+  "title": "Claude KVM",
+  "websiteUrl": "https://github.com/ARAS-Workspace/claude-kvm",
+  "repository": {
+    "url": "https://github.com/ARAS-Workspace/claude-kvm",
+    "source": "github"
+  },
+  "version": "2.0.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "claude-kvm",
+      "version": "2.0.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "VNC_HOST",
+          "description": "VNC server hostname or IP",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "VNC_PORT",
+          "description": "VNC server port",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "VNC_USERNAME",
+          "description": "VNC/ARD username",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "VNC_PASSWORD",
+          "description": "VNC/ARD password",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "CLAUDE_KVM_DAEMON_PATH",
+          "description": "Path to claude-kvm-daemon binary",
+          "isRequired": true,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
