@@ -104,6 +104,15 @@ jobs:
             ./test-screenshots/recording.mp4 2>/dev/null || \
           echo "No recording file"
 
+      - name: Reset remote desktop
+        if: always()
+        run: |
+          ssh -S /tmp/mac_ssh placeholder "
+            osascript -e 'quit app \"Calculator\"' 2>/dev/null
+            osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
+            osascript -e 'tell app \"System Events\" to key code 36' 2>/dev/null
+          " || true
+
       - name: Close SSH
         if: always()
         run: |
