@@ -64,7 +64,7 @@ jobs:
 
       - name: Prevent display sleep
         run: |
-          ssh -S /tmp/mac_ssh placeholder "caffeinate -d -i -s &"
+          ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
 
       # ── Screen Recording ───────────────────────────────────
 
