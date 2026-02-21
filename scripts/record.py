@@ -6,6 +6,7 @@ import sys
 import time
 
 SSH_CMD = ["ssh", "-S", "/tmp/mac_ssh", "placeholder"]
+FFMPEG = "/opt/homebrew/bin/ffmpeg"
 
 
 def ssh(cmd, check=False):
@@ -18,43 +19,37 @@ def ssh(cmd, check=False):
 
 
 def start():
-    uid = ssh("id -u", check=True)
+    # Kill any previous screen session
+    ssh("screen -S recording -X quit 2>/dev/null")
+    ssh("rm -f /tmp/ffmpeg.pid /tmp/recording.mp4 /tmp/ffmpeg.log")
 
-    ffmpeg_path = "/opt/homebrew/bin/ffmpeg"
-
-    # Start ffmpeg in GUI session context via launchctl
+    # Start ffmpeg in a detached screen session
     ssh(
-        f"sudo launchctl asuser {uid} bash -c '"
-        f"{ffmpeg_path} -f avfoundation -capture_cursor 1 -framerate 10 "
-        "-i 0:none -c:v libx264 -preset ultrafast -pix_fmt yuv420p "
-        "/tmp/recording.mp4 </dev/null >/tmp/ffmpeg.log 2>&1 & "
-        "echo $! > /tmp/ffmpeg.pid; disown"
-        "'"
+        f"screen -dmS recording {FFMPEG} "
+        "-f avfoundation -capture_cursor 1 -framerate 10 "
+        "-i 0:none -c:v libx264 -preset ultrafast "
+        "/tmp/recording.mp4"
     )
 
     time.sleep(3)
 
-    pid = ssh("cat /tmp/ffmpeg.pid 2>/dev/null")
-    if not pid:
-        print("ERROR: No PID file", file=sys.stderr)
-        sys.exit(1)
-
-    alive = ssh(f"kill -0 {pid} 2>/dev/null && echo yes || echo no")
+    # Verify screen session is alive
+    alive = ssh("screen -ls | grep -q recording && echo yes || echo no")
     if alive == "yes":
-        print(f"Recording started (PID {pid})")
+        print("Recording started (screen session: recording)")
     else:
         log = ssh("cat /tmp/ffmpeg.log 2>/dev/null")
-        print(f"Recording failed. ffmpeg log:\n{log}", file=sys.stderr)
+        print(f"Recording failed. Log:\n{log}", file=sys.stderr)
         sys.exit(1)
 
 
 def stop():
-    pid = ssh("cat /tmp/ffmpeg.pid 2>/dev/null")
-    if pid:
-        ssh(f"kill -INT {pid} 2>/dev/null; sleep 2")
-        print(f"Recording stopped (PID {pid})")
-    else:
-        print("No recording PID found")
+    # Send q to ffmpeg for graceful stop
+    ssh("screen -S recording -X stuff 'q' 2>/dev/null")
+    time.sleep(3)
+    # Force kill if still alive
+    ssh("screen -S recording -X quit 2>/dev/null")
+    print("Recording stopped")
 
 
 if __name__ == "__main__":
