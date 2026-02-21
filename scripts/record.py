@@ -32,6 +32,9 @@ def start():
 
     time.sleep(3)
 
+    # Minimize Terminal window
+    ssh("osascript -e 'tell application \"Terminal\" to set miniaturized of front window to true' 2>/dev/null")
+
     alive = ssh("pgrep -f avfoundation >/dev/null && echo yes || echo no")
     if alive == "yes":
         print("Recording started")
