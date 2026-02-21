@@ -43,10 +43,10 @@ Aşağıdaki görsel içerikler, CI ortamında VNC üzerinden gerçekleştirilen
 5. Verify both folders exist, then call task_complete()
 ```
 
-Ekran kaydı ve terminal logları [Demo Asset Üretimi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22245043165) workflow'unda 4x hızlandırılarak işlenmiştir.
+Ekran kaydı ve terminal logları [Demo Asset Üretimi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261951141) workflow'unda 4x hızlandırılarak işlenmiştir.
 
-- [Entegrasyon Testi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22242573195)
-- [Demo Asset Üretimi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22245043165)
+- [Entegrasyon Testi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261661594)
+- [Demo Asset Üretimi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261951141)
 
 > [!NOTE]
 > Bu akış, süreci anlaşılır kılmak adına basit tutularak belirlenmiştir. Daha kapsamlı senaryolar alt branch'lerde ele alınacak olup, main branch üzerindeki test akışı her zaman temiz ve sade kalacaktır. Ürünün gerçek iş akışlarına nasıl dahil olduğunu görmek isterseniz bu testleri incelemenizi öneririm — aracı değerlendirme sürecinizde en etkili referans bu görüntüler olacaktır. Bununla birlikte, incelediğiniz bu döküman bundan sonra yapılacak testlerin uçtan uca test disiplinini açıkça ortaya koymaktadır.
@@ -54,19 +54,20 @@ Ekran kaydı ve terminal logları [Demo Asset Üretimi](https://github.com/ARAS-
 ### Artifact
 
 ```
-test/assets/
+assets/test/linux/
+├── demo.cast
 ├── demo-screen.mp4
 ├── demo-terminal.gif
 ├── demo-terminal.mp4
-├── press-kit-assets-22242573195.gif
-└── press-kit-assets-22242573195.mp4
+├── demo-run-22261661594.gif
+└── demo-run-22261661594.mp4
 ```
 
-- [demo-screen.mp4](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/demo-screen.mp4)
-- [demo-terminal.gif](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/demo-terminal.gif)
-- [demo-terminal.mp4](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/demo-terminal.mp4)
-- [press-kit-assets-22242573195.gif](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/press-kit-assets-22242573195.gif)
-- [press-kit-assets-22242573195.mp4](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/press-kit-assets-22242573195.mp4)
+- [demo-screen.mp4](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/linux/demo-screen.mp4)
+- [demo-terminal.gif](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/linux/demo-terminal.gif)
+- [demo-terminal.mp4](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/linux/demo-terminal.mp4)
+- [demo-run-22261661594.gif](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/linux/demo-run-22261661594.gif)
+- [demo-run-22261661594.mp4](https://github.com/ARAS-Workspace/claude-kvm/blob/press-kit/assets/test/linux/demo-run-22261661594.mp4)
 
 ## Dizin Hiyerarşisi
 
