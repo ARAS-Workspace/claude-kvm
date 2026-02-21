@@ -22,63 +22,7 @@ Claude KVM, VNC protokolü üzerinden uzak masaüstü ortamlarını kontrol eden
 
 ## Mimari
 
-```mermaid
-graph TB
-    subgraph MCP["MCP Client (Claude)"]
-        AI["Claude"]
-    end
-
-    subgraph Proxy["claude-kvm · MCP Proxy (stdio)"]
-        direction TB
-        Server["MCP Server<br/><code>index.js</code>"]
-        Tools["Tool Definitions<br/><code>tools/index.js</code>"]
-        Server --> Tools
-    end
-
-    subgraph Daemon["claude-kvm-daemon · Native VNC Client (stdin/stdout)"]
-        direction TB
-        CMD["Command Handler<br/><i>PC Dispatch</i>"]
-        Scale["Display Scaling<br/><i>Scaled ↔ Native</i>"]
-
-        subgraph Screen["Ekran"]
-            Capture["Frame Capture<br/><i>PNG · Crop · Diff</i>"]
-            OCR["OCR Algılama<br/><i>Apple Vision</i>"]
-        end
-
-        subgraph InputGroup["Girdi"]
-            Mouse["Fare<br/><i>Click · Drag · Move · Scroll</i>"]
-            KB["Klavye<br/><i>Tap · Combo · Type · Paste</i>"]
-        end
-
-        VNC["VNC Bridge<br/><i>LibVNCClient 0.9.15</i>"]
-
-        CMD --> Scale
-        Scale --> Capture
-        Scale --> Mouse
-        Scale --> KB
-        Capture -.->|"framebuffer"| VNC
-        Mouse -->|"pointer events"| VNC
-        KB -->|"key events"| VNC
-    end
-
-    subgraph Target["Hedef Makine"]
-        VNC_Server["VNC Server<br/><i>:5900</i>"]
-        Desktop["Masaüstü Ortamı"]
-        VNC_Server --> Desktop
-    end
-
-    AI <-->|"stdio<br/>JSON-RPC"| Server
-    Server <-->|"stdin/stdout<br/>PC (NDJSON)"| CMD
-    VNC <-->|"RFB Protocol<br/>TCP :5900"| VNC_Server
-
-    classDef proxy fill:#1a1a2e,stroke:#16213e,color:#e5e5e5
-    classDef daemon fill:#0f3460,stroke:#533483,color:#e5e5e5
-    classDef target fill:#1a1a2e,stroke:#e94560,color:#e5e5e5
-
-    class Server,Tools proxy
-    class CMD,Scale,VNC,Capture,Mouse,KB daemon
-    class VNC_Server,Desktop target
-```
+![Mimari](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/article/claude-kvm/assets/architecture.png)
 
 ### Katmanlar
 
@@ -169,7 +113,7 @@ Proje dizinine `.mcp.json` dosyası oluşturun:
 ```
 
 > [!NOTE]
-> Araç, CI üzerinden uçtan uca test edilmektedir — Claude, VNC üzerinden görevleri yürütürken bağımsız bir görüş modeli sonuçları gözlemleyip doğrular. Canlı workflow çalıştırmaları, sistem komutları ve demo kayıtları için [Entegrasyon Testi](test/README_TR.md) sayfasına bakınız.
+> Araç, CI üzerinden uçtan uca test edilmektedir — Claude, VNC üzerinden görevleri yürütürken bağımsız bir görüş modeli sonuçları gözlemleyip doğrular. Canlı workflow çalıştırmaları, sistem komutları ve demo kayıtları için [Entegrasyon Testi](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README_TR.md) sayfasına bakınız.
 
 ### Yapılandırma
 
