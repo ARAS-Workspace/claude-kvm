@@ -150,21 +150,19 @@ jobs:
             demo-run-${{ inputs.run_id }}.mp4
             demo-run-${{ inputs.run_id }}.gif
 
-      # ── Push to main ───────────────────────────────────────
+      # ── Push to press-kit ──────────────────────────────────
 
-      - name: Push assets to main
+      - name: Push assets to press-kit
         run: |
           NAME="demo-run-${{ inputs.run_id }}"
-          git fetch origin main
-          git checkout main
 
-          mkdir -p test/assets
+          mkdir -p assets/test/linux
           cp demo.cast demo-terminal.gif demo-terminal.mp4 \
              demo-screen.mp4 "${NAME}.mp4" "${NAME}.gif" \
-             test/assets/
+             assets/test/linux/
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add test/assets/
+          git add assets/test/linux/
           git commit -m "Add demo assets from run ${NAME}"
-          git push origin main
+          git push origin press-kit
