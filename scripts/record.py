@@ -20,8 +20,9 @@ def ssh(cmd, check=False):
 def start():
     uid = ssh("id -u", check=True)
 
-    # Resolve ffmpeg path on remote
-    ffmpeg_path = ssh("which ffmpeg", check=True)
+    # Resolve ffmpeg path (Homebrew on Apple Silicon)
+    ffmpeg_path = ssh("which ffmpeg 2>/dev/null || echo /opt/homebrew/bin/ffmpeg")
+    ssh(f"test -x {ffmpeg_path}", check=True)
 
     # Start ffmpeg in GUI session context via launchctl
     ssh(
