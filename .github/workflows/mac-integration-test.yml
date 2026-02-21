@@ -59,18 +59,15 @@ jobs:
 
       - name: Start screen recording
         run: |
-          MAC_SSH="ssh -S /tmp/mac_ssh placeholder"
-
-          # ffmpeg avfoundation — requires Screen Recording permission for Terminal
-          $MAC_SSH "nohup ffmpeg -f avfoundation -capture_cursor 1 -framerate 10 \
+          ssh -S /tmp/mac_ssh placeholder bash -s << 'REMOTE'
+          ffmpeg -f avfoundation -capture_cursor 1 -framerate 10 \
             -i '0:none' -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
-            /tmp/recording.mp4 > /tmp/ffmpeg.log 2>&1 & echo \$! > /tmp/ffmpeg.pid" \
-            2>/dev/null
-
+            /tmp/recording.mp4 </dev/null >/tmp/ffmpeg.log 2>&1 &
+          echo $! > /tmp/ffmpeg.pid
+          disown
           sleep 2
-          $MAC_SSH "kill -0 \$(cat /tmp/ffmpeg.pid 2>/dev/null) 2>/dev/null" \
-            && echo "Screen recording started" \
-            || echo "Screen recording failed (non-fatal)"
+          kill -0 $(cat /tmp/ffmpeg.pid) 2>/dev/null && echo "Recording started" || echo "Recording failed"
+          REMOTE
 
       # ── Test Execution ─────────────────────────────────────
 
