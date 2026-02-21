@@ -7,6 +7,10 @@ on:
         description: 'Workflow run ID'
         required: true
 
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   persist:
     runs-on: ubuntu-latest
