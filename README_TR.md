@@ -152,6 +152,9 @@ Proje dizinine `.mcp.json` dosyası oluşturun:
 }
 ```
 
+> [!NOTE]
+> Araç, CI üzerinden uçtan uca test edilmektedir — Claude, VNC üzerinden görevleri yürütürken bağımsız bir görüş modeli sonuçları gözlemleyip doğrular. Canlı workflow çalıştırmaları, sistem komutları ve demo kayıtları için [Entegrasyon Testi](test/README_TR.md) sayfasına bakınız.
+
 ### Yapılandırma
 
 #### MCP Proxy (ENV)

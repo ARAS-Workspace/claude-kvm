@@ -152,6 +152,9 @@ Create a `.mcp.json` file in your project directory:
 }
 ```
 
+> [!NOTE]
+> The tool is end-to-end tested via CI — Claude executes tasks over VNC while an independent vision model observes and verifies the results. See the [Integration Test](test/README.md) for live workflow runs, system prompts, and demo recordings.
+
 ### Configuration
 
 #### MCP Proxy (ENV)

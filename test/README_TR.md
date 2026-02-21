@@ -25,6 +25,49 @@ sequenceDiagram
     E->>E: task_complete()
 ```
 
+### Sistem Komutları
+
+- [Yürütücü (Claude)](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/agents/executor/system_prompt.md)
+- [Gözlemci (Qwen-VL)](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/agents/observer/system_prompt.md)
+- [Test Komutu](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/test_prompt.md)
+
+## Canlı Süreçler
+
+Aşağıdaki görsel içerikler, CI ortamında VNC üzerinden gerçekleştirilen bir entegrasyon testinden türetilmiştir. Test sırasında verilen komut:
+
+```
+1. Open the File Manager (Thunar) — double-click the "Home" icon on the desktop or find it in the taskbar
+2. Create a new folder named "claude-kvm-test" — right-click empty area → Create Folder
+3. Open "claude-kvm-test"
+4. Inside it, create another folder named "logs"
+5. Verify both folders exist, then call task_complete()
+```
+
+Ekran kaydı ve terminal logları [Demo Asset Üretimi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22245043165) workflow'unda 4x hızlandırılarak işlenmiştir.
+
+- [Entegrasyon Testi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22242573195)
+- [Demo Asset Üretimi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22245043165)
+
+> [!NOTE]
+> Bu akış, süreci anlaşılır kılmak adına basit tutularak belirlenmiştir. Daha kapsamlı senaryolar alt branch'lerde ele alınacak olup, main branch üzerindeki test akışı her zaman temiz ve sade kalacaktır. Ürünün gerçek iş akışlarına nasıl dahil olduğunu görmek isterseniz bu testleri incelemenizi öneririm — aracı değerlendirme sürecinizde en etkili referans bu görüntüler olacaktır.
+
+### Artifact
+
+```
+test/assets/
+├── demo-screen.mp4
+├── demo-terminal.gif
+├── demo-terminal.mp4
+├── press-kit-assets-22242573195.gif
+└── press-kit-assets-22242573195.mp4
+```
+
+- [demo-screen.mp4](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/demo-screen.mp4)
+- [demo-terminal.gif](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/demo-terminal.gif)
+- [demo-terminal.mp4](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/demo-terminal.mp4)
+- [press-kit-assets-22242573195.gif](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/press-kit-assets-22242573195.gif)
+- [press-kit-assets-22242573195.mp4](https://github.com/ARAS-Workspace/claude-kvm/tree/main/test/assets/press-kit-assets-22242573195.mp4)
+
 ## Dizin Hiyerarşisi
 
 ```
