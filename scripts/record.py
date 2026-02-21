@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start/stop QuickTime screen recording on remote Mac via SSH."""
+"""Start/stop screen recording on remote Mac via osascript + Terminal.app."""
 
 import subprocess
 import sys
@@ -7,28 +7,12 @@ import time
 
 SSH_CMD = ["ssh", "-S", "/tmp/mac_ssh", "placeholder"]
 
-START_SCRIPT = """
-tell application "QuickTime Player"
-    activate
-    set newRec to new screen recording
-    start newRec
-end tell
-"""
-
-STOP_SCRIPT = """
-tell application "QuickTime Player"
-    stop (document 1)
-    delay 2
-    export document 1 in (POSIX file "/tmp/recording.mov") using settings preset "480p"
-    delay 1
-    close document 1 saving no
-    quit
-end tell
-"""
+FFMPEG = "/opt/homebrew/bin/ffmpeg"
+OUTPUT = "/tmp/recording.mp4"
 
 
 def ssh(cmd, check=False):
-    r = subprocess.run(SSH_CMD + [cmd], capture_output=True, text=True, timeout=60)
+    r = subprocess.run(SSH_CMD + [cmd], capture_output=True, text=True, timeout=30)
     if check and r.returncode != 0:
         print(f"SSH error: {r.stderr.strip()}", file=sys.stderr)
         sys.exit(1)
@@ -36,22 +20,38 @@ def ssh(cmd, check=False):
 
 
 def start():
-    ssh("rm -f /tmp/recording.mov")
-    result = ssh(f"osascript -e '{START_SCRIPT}'")
-    time.sleep(2)
-    alive = ssh("pgrep -x 'QuickTime Player' >/dev/null && echo yes || echo no")
+    # Cleanup previous
+    ssh(f"kill $(pgrep -f avfoundation) 2>/dev/null; rm -f {OUTPUT}")
+
+    # Launch ffmpeg inside Terminal.app via osascript (GUI session context)
+    ssh(
+        "osascript -e 'tell application \"Terminal\" to do script "
+        f"\"{FFMPEG} -f avfoundation -capture_cursor 1 -framerate 10 "
+        f"-i '\\''0:none'\\'' -c:v libx264 -preset ultrafast {OUTPUT}\"'"
+    )
+
+    time.sleep(3)
+
+    alive = ssh("pgrep -f avfoundation >/dev/null && echo yes || echo no")
     if alive == "yes":
-        print("QuickTime screen recording started")
+        print("Recording started")
     else:
-        print(f"Recording failed: {result}", file=sys.stderr)
+        print("Recording failed", file=sys.stderr)
         sys.exit(1)
 
 
 def stop():
-    result = ssh(f"osascript -e '{STOP_SCRIPT}'")
-    if result:
-        print(result)
-    print("QuickTime recording stopped and exported")
+    ssh("kill -INT $(pgrep -f avfoundation) 2>/dev/null")
+    time.sleep(3)
+
+    size = ssh(f"stat -f%z {OUTPUT} 2>/dev/null")
+    if size and int(size) > 0:
+        print(f"Recording stopped ({int(size) // 1024}KB)")
+    else:
+        print("Recording stopped (no output file)")
+
+    # Close Terminal window
+    ssh("osascript -e 'tell application \"Terminal\" to close front window' 2>/dev/null")
 
 
 if __name__ == "__main__":

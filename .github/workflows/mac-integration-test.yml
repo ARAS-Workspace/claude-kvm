@@ -95,8 +95,8 @@ jobs:
         run: |
           python3 scripts/record.py stop || true
           scp -o ControlPath=/tmp/mac_ssh \
-            placeholder:/tmp/recording.mov \
-            ./test-screenshots/recording.mov 2>/dev/null || \
+            placeholder:/tmp/recording.mp4 \
+            ./test-screenshots/recording.mp4 2>/dev/null || \
           echo "No recording file"
 
       - name: Close SSH
