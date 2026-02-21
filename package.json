@@ -6,7 +6,7 @@
   "author": "Rıza Emre ARAS <r.emrearas@proton.me>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ARAS-Workspace/claude-kvm.git"
+    "url": "git+https://github.com/ARAS-Workspace/claude-kvm.git"
   },
   "keywords": [
     "mcp",
