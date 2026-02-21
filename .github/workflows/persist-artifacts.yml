@@ -1,0 +1,40 @@
+name: Persist Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_name:
+        description: 'Artifact name to download'
+        required: true
+      run_id:
+        description: 'Workflow run ID that produced the artifact'
+        required: true
+
+jobs:
+  persist:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout press-kit branch
+        uses: actions/checkout@v4
+        with:
+          ref: press-kit
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ./downloaded
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to press-kit
+        run: |
+          TARGET="artifacts/${{ inputs.artifact_name }}"
+          mkdir -p "$TARGET"
+          cp -r ./downloaded/* "$TARGET/"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f "artifacts/"
+          git commit -m "Persist ${{ inputs.artifact_name }} from run ${{ inputs.run_id }}"
+          git push origin press-kit
