@@ -17,6 +17,9 @@ Claude KVM, VNC protokolü üzerinden uzak masaüstü ortamlarını kontrol eden
 > [!NOTE]
 > Testler GitHub Actions üzerinde CI ortamında şeffaf biçimde yürütülmektedir — her adım aşama aşama görülebilir. Her testin sonunda, entegrasyon başarılı ya da başarısız olsun, ajanın oturum boyunca attığı her adımın ekran görüntüleri ve oturumun tamamını yansıtan `.mp4` video kaydı yer almaktadır. Bu kayıtları ve görüntüleri inceleyerek ajanın sistem komutundaki görevi hangi aşamalardan geçerek ne kadar sürede tamamladığını gözlemleyebilir, MCP sunucusunu kendi ortamınızda kullanırken buradaki örneklerden faydalanarak sistem komutunuzu veya talimatlarınızı şekillendirebilirsiniz.
 
+> [!WARNING]
+> Bu çalıştırmalara ait artifact'ların süresi GitHub'ın artifact saklama politikası nedeniyle dolmuş olabilir. Kalıcı kopyalar [Persist Artifacts](https://github.com/ARAS-Workspace/claude-kvm/actions/workflows/persist-artifacts.yml) workflow'u aracılığıyla hazırlanmıştır ve run ID ile press-kit branch'indeki [`artifacts/`](https://github.com/ARAS-Workspace/claude-kvm/tree/press-kit/artifacts) dizininden her zaman erişilebilir.
+
 ## Mimari
 
 ```mermaid

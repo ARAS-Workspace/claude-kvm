@@ -16,6 +16,9 @@ Claude KVM is an MCP tool that controls remote desktop environments over VNC. It
 > [!NOTE]
 > Tests are conducted transparently on GitHub Actions — each step is visible in the CI environment. At the end of every test, whether the integration passes or fails, you'll find screenshots of each step the agent took during the session, along with an `.mp4` video recording that captures the entire session. By reviewing these recordings and screenshots, you can observe how the agent progressed through each stage, how long the task took, and what decisions were made based on the system prompt. You can use these examples as a reference when crafting your own system prompts or instructions for the MCP server in your own environment.
 
+> [!WARNING]
+> Artifacts attached to these runs may have expired due to GitHub's artifact retention policy. Persistent copies are prepared via the [Persist Artifacts](https://github.com/ARAS-Workspace/claude-kvm/actions/workflows/persist-artifacts.yml) workflow and can always be accessed by run ID from the [`artifacts/`](https://github.com/ARAS-Workspace/claude-kvm/tree/press-kit/artifacts) directory on the press-kit branch.
+
 ## Architecture
 
 ```mermaid
