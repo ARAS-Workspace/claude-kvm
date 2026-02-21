@@ -45,10 +45,6 @@ jobs:
           printf '%s\n' "$MAC_SSH_PRIVATE_KEY" > /tmp/mac_key
           chmod 600 /tmp/mac_key
 
-          # Verify key format
-          head -1 /tmp/mac_key
-          ssh-keygen -y -f /tmp/mac_key > /dev/null && echo "Key valid" || echo "Key invalid"
-
           # Open tunnel with control socket
           ssh -fN \
             -L 5901:localhost:${MAC_VNC_PORT:-5900} \
