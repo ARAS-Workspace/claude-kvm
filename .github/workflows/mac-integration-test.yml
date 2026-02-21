@@ -40,10 +40,14 @@ jobs:
           # Mask host IP in logs
           echo "::add-mask::$MAC_HOST"
 
-          # Write SSH key
+          # Write SSH key (printf preserves newlines)
           mkdir -p ~/.ssh
-          echo "$MAC_SSH_PRIVATE_KEY" > /tmp/mac_key
+          printf '%s\n' "$MAC_SSH_PRIVATE_KEY" > /tmp/mac_key
           chmod 600 /tmp/mac_key
+
+          # Verify key format
+          head -1 /tmp/mac_key
+          ssh-keygen -y -f /tmp/mac_key > /dev/null && echo "Key valid" || echo "Key invalid"
 
           # Open tunnel with control socket
           ssh -fN \
