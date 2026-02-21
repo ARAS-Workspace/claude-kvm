@@ -282,4 +282,6 @@ macOS, ARD auth type 30 kimlik bilgisi isteği üzerinden otomatik algılanır. 
 
 ---
 
+[Bu dökümanı GitHub üzerinde görüntüle](https://github.com/ARAS-Workspace/claude-kvm/blob/main/README_TR.md)
+
 Copyright (c) 2026 Rıza Emre ARAS — MIT Lisansı

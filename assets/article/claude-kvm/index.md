@@ -281,4 +281,6 @@ macOS is auto-detected via the ARD auth type 30 credential request. When detecte
 
 ---
 
+[View this document on GitHub](https://github.com/ARAS-Workspace/claude-kvm/blob/main/README.md)
+
 Copyright (c) 2026 Riza Emre ARAS — MIT License
