@@ -1,4 +1,4 @@
-{"version":2,"width":120,"height":35,"timestamp":1771697718,"title":"Claude KVM — Integration Test","env":{"TERM":"xterm-256color","SHELL":"/bin/bash"}}
+{"version":2,"width":120,"height":35,"timestamp":1771698293,"title":"Claude KVM — Integration Test","env":{"TERM":"xterm-256color","SHELL":"/bin/bash"}}
 [0,"o","[CONN] Attempt 1/12...\r\n"]
 [0.25,"o","[MCP] Tools: vnc_command, action_queue, task_complete, task_failed\r\n"]
 [0.28,"o","[MCP] Daemon OK — 1280×720\r\n"]
