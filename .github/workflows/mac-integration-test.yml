@@ -61,26 +61,16 @@ jobs:
         run: |
           MAC_SSH="ssh -S /tmp/mac_ssh placeholder"
 
-          $MAC_SSH "which ffmpeg || brew install ffmpeg" 2>/dev/null || true
-
-          # Try ffmpeg avfoundation
+          # ffmpeg avfoundation — requires Screen Recording permission for Terminal
           $MAC_SSH "nohup ffmpeg -f avfoundation -capture_cursor 1 -framerate 10 \
             -i '1:none' -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
             /tmp/recording.mp4 > /tmp/ffmpeg.log 2>&1 & echo \$! > /tmp/ffmpeg.pid" \
             2>/dev/null
 
-          # Verify — fallback to screencapture if ffmpeg failed
           sleep 2
-          RUNNING=$($MAC_SSH "kill -0 \$(cat /tmp/ffmpeg.pid 2>/dev/null) 2>/dev/null && echo yes || echo no" 2>/dev/null)
-
-          if [ "$RUNNING" != "yes" ]; then
-            echo "ffmpeg failed, trying screencapture..."
-            GUI_UID=$($MAC_SSH "id -u" 2>/dev/null)
-            $MAC_SSH "nohup sudo launchctl asuser ${GUI_UID} \
-              /usr/sbin/screencapture -v /tmp/recording.mov \
-              > /tmp/screencapture.log 2>&1 & echo \$! > /tmp/ffmpeg.pid" \
-              2>/dev/null || echo "Screen recording not available (non-fatal)"
-          fi
+          $MAC_SSH "kill -0 \$(cat /tmp/ffmpeg.pid 2>/dev/null) 2>/dev/null" \
+            && echo "Screen recording started" \
+            || echo "Screen recording failed (non-fatal)"
 
       # ── Test Execution ─────────────────────────────────────
 
@@ -122,9 +112,6 @@ jobs:
           scp -o ControlPath=/tmp/mac_ssh \
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/recording.mp4 2>/dev/null || \
-          scp -o ControlPath=/tmp/mac_ssh \
-            placeholder:/tmp/recording.mov \
-            ./test-screenshots/recording.mov 2>/dev/null || \
           echo "No recording file"
 
       - name: Close SSH
