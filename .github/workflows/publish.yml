@@ -81,6 +81,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json server.json
-          git commit -m "$VERSION"
+          git commit -m "bump v$VERSION"
           git tag "v$VERSION"
           git push origin main --tags
