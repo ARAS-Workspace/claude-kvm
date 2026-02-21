@@ -33,7 +33,6 @@ jobs:
       - name: Open SSH tunnel
         env:
           MAC_SSH_PRIVATE_KEY: ${{ secrets.MAC_SSH_PRIVATE_KEY }}
-          MAC_SSH_KEY_PASSPHRASE: ${{ secrets.MAC_SSH_KEY_PASSPHRASE }}
           MAC_HOST: ${{ secrets.MAC_HOST }}
           MAC_VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
           MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
@@ -46,19 +45,6 @@ jobs:
           echo "$MAC_SSH_PRIVATE_KEY" > /tmp/mac_key
           chmod 600 /tmp/mac_key
 
-          # Create askpass script for passphrase
-          cat > /tmp/askpass.sh << 'ASKPASS'
-          #!/bin/sh
-          echo "$MAC_SSH_KEY_PASSPHRASE"
-          ASKPASS
-          chmod +x /tmp/askpass.sh
-
-          # Add key to agent
-          eval "$(ssh-agent -s)"
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> $GITHUB_ENV
-          SSH_ASKPASS=/tmp/askpass.sh SSH_ASKPASS_REQUIRE=force ssh-add /tmp/mac_key
-
           # Open tunnel with control socket
           ssh -fN \
             -L 5901:localhost:${MAC_VNC_PORT:-5900} \
@@ -69,6 +55,7 @@ jobs:
             -o ControlPath=/tmp/mac_ssh \
             -o ControlMaster=yes \
             -o ControlPersist=yes \
+            -i /tmp/mac_key \
             "${MAC_VNC_USERNAME}@${MAC_HOST}"
 
           echo "Tunnel ready — localhost:5901"
