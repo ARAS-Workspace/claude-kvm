@@ -1,17 +1,34 @@
 #!/usr/bin/env python3
-"""Start/stop screen recording on remote Mac via SSH control socket."""
+"""Start/stop QuickTime screen recording on remote Mac via SSH."""
 
 import subprocess
 import sys
 import time
 
 SSH_CMD = ["ssh", "-S", "/tmp/mac_ssh", "placeholder"]
-FFMPEG = "/opt/homebrew/bin/ffmpeg"
+
+START_SCRIPT = """
+tell application "QuickTime Player"
+    activate
+    set newRec to new screen recording
+    start newRec
+end tell
+"""
+
+STOP_SCRIPT = """
+tell application "QuickTime Player"
+    stop (document 1)
+    delay 2
+    export document 1 in (POSIX file "/tmp/recording.mov") using settings preset "480p"
+    delay 1
+    close document 1 saving no
+    quit
+end tell
+"""
 
 
 def ssh(cmd, check=False):
-    """Run command on remote Mac via control socket."""
-    r = subprocess.run(SSH_CMD + [cmd], capture_output=True, text=True, timeout=30)
+    r = subprocess.run(SSH_CMD + [cmd], capture_output=True, text=True, timeout=60)
     if check and r.returncode != 0:
         print(f"SSH error: {r.stderr.strip()}", file=sys.stderr)
         sys.exit(1)
@@ -19,37 +36,22 @@ def ssh(cmd, check=False):
 
 
 def start():
-    # Kill any previous screen session
-    ssh("screen -S recording -X quit 2>/dev/null")
-    ssh("rm -f /tmp/ffmpeg.pid /tmp/recording.mp4 /tmp/ffmpeg.log")
-
-    # Start ffmpeg in a detached screen session
-    ssh(
-        f"screen -dmS recording {FFMPEG} "
-        "-f avfoundation -capture_cursor 1 -framerate 10 "
-        "-i 0:none -c:v libx264 -preset ultrafast "
-        "/tmp/recording.mp4"
-    )
-
-    time.sleep(3)
-
-    # Verify screen session is alive
-    alive = ssh("screen -ls | grep -q recording && echo yes || echo no")
+    ssh("rm -f /tmp/recording.mov")
+    result = ssh(f"osascript -e '{START_SCRIPT}'")
+    time.sleep(2)
+    alive = ssh("pgrep -x 'QuickTime Player' >/dev/null && echo yes || echo no")
     if alive == "yes":
-        print("Recording started (screen session: recording)")
+        print("QuickTime screen recording started")
     else:
-        log = ssh("cat /tmp/ffmpeg.log 2>/dev/null")
-        print(f"Recording failed. Log:\n{log}", file=sys.stderr)
+        print(f"Recording failed: {result}", file=sys.stderr)
         sys.exit(1)
 
 
 def stop():
-    # Send q to ffmpeg for graceful stop
-    ssh("screen -S recording -X stuff 'q' 2>/dev/null")
-    time.sleep(3)
-    # Force kill if still alive
-    ssh("screen -S recording -X quit 2>/dev/null")
-    print("Recording stopped")
+    result = ssh(f"osascript -e '{STOP_SCRIPT}'")
+    if result:
+        print(result)
+    print("QuickTime recording stopped and exported")
 
 
 if __name__ == "__main__":
