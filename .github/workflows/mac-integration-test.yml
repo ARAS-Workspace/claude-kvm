@@ -57,6 +57,11 @@ jobs:
 
       # ── Screen Recording ───────────────────────────────────
 
+      - name: Cleanup remote recordings
+        run: |
+          ssh -S /tmp/mac_ssh placeholder \
+            "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
+
       - name: Start screen recording
         run: python3 scripts/record.py start
 
