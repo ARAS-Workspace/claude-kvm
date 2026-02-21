@@ -5,6 +5,17 @@ Claude KVM is an MCP tool that controls remote desktop environments over VNC. It
 [![Claude KVM Demo](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/linux/demo-run-22261661594.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README.md)
 [![Claude KVM Demo Mac](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/mac/demo-mac-run-22261487249.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/test/e2e/mac/test/README.md)
 
+## Live Test Runs
+
+- [Integration Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261661594)
+- [Mac Integration Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261487249)
+- [Mac Calculator Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261139721)
+- [Mac Scientific Calculator Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261184519)
+- [Mac Safari Browsing Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261430282)
+
+> [!NOTE]
+> Tests are conducted transparently on GitHub Actions — each step is visible in the CI environment. At the end of every test, whether the integration passes or fails, you'll find screenshots of each step the agent took during the session, along with an `.mp4` video recording that captures the entire session. By reviewing these recordings and screenshots, you can observe how the agent progressed through each stage, how long the task took, and what decisions were made based on the system prompt. You can use these examples as a reference when crafting your own system prompts or instructions for the MCP server in your own environment.
+
 ## Architecture
 
 ```mermaid

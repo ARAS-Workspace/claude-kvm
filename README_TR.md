@@ -6,6 +6,17 @@ Claude KVM, VNC protokolü üzerinden uzak masaüstü ortamlarını kontrol eden
 [![Claude KVM Demo Mac](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/mac/demo-mac-run-22261487249.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/test/e2e/mac/test/README_TR.md)
 
 
+## Canlı Test Ortamı
+
+- [Integration Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261661594)
+- [Mac Integration Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261487249)
+- [Mac Calculator Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261139721)
+- [Mac Scientific Calculator Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261184519)
+- [Mac Safari Browsing Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261430282)
+
+> [!NOTE]
+> Testler GitHub Actions üzerinde CI ortamında şeffaf biçimde yürütülmektedir — her adım aşama aşama görülebilir. Her testin sonunda, entegrasyon başarılı ya da başarısız olsun, ajanın oturum boyunca attığı her adımın ekran görüntüleri ve oturumun tamamını yansıtan `.mp4` video kaydı yer almaktadır. Bu kayıtları ve görüntüleri inceleyerek ajanın sistem komutundaki görevi hangi aşamalardan geçerek ne kadar sürede tamamladığını gözlemleyebilir, MCP sunucusunu kendi ortamınızda kullanırken buradaki örneklerden faydalanarak sistem komutunuzu veya talimatlarınızı şekillendirebilirsiniz.
+
 ## Mimari
 
 ```mermaid
