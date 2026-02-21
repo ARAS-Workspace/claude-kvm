@@ -46,16 +46,18 @@ jobs:
           echo "$MAC_SSH_PRIVATE_KEY" > /tmp/mac_key
           chmod 600 /tmp/mac_key
 
-          # Start ssh-agent with passphrase
+          # Create askpass script for passphrase
+          cat > /tmp/askpass.sh << 'ASKPASS'
+          #!/bin/sh
+          echo "$MAC_SSH_KEY_PASSPHRASE"
+          ASKPASS
+          chmod +x /tmp/askpass.sh
+
+          # Add key to agent
           eval "$(ssh-agent -s)"
-          DISPLAY=:0 SSH_ASKPASS_REQUIRE=force \
-            SSH_ASKPASS="$(mktemp /tmp/askpass.XXXXXX)" \
-            bash -c "
-              echo '#!/bin/sh' > \$SSH_ASKPASS
-              echo 'echo \"\$MAC_SSH_KEY_PASSPHRASE\"' >> \$SSH_ASKPASS
-              chmod +x \$SSH_ASKPASS
-              ssh-add /tmp/mac_key
-            "
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> $GITHUB_ENV
+          SSH_ASKPASS=/tmp/askpass.sh SSH_ASKPASS_REQUIRE=force ssh-add /tmp/mac_key
 
           # Open tunnel with control socket
           ssh -fN \
