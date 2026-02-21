@@ -20,10 +20,13 @@ def ssh(cmd, check=False):
 def start():
     uid = ssh("id -u", check=True)
 
+    # Resolve ffmpeg path on remote
+    ffmpeg_path = ssh("which ffmpeg", check=True)
+
     # Start ffmpeg in GUI session context via launchctl
     ssh(
         f"sudo launchctl asuser {uid} bash -c '"
-        "ffmpeg -f avfoundation -capture_cursor 1 -framerate 10 "
+        f"{ffmpeg_path} -f avfoundation -capture_cursor 1 -framerate 10 "
         "-i 0:none -c:v libx264 -preset ultrafast -pix_fmt yuv420p "
         "/tmp/recording.mp4 </dev/null >/tmp/ffmpeg.log 2>&1 & "
         "echo $! > /tmp/ffmpeg.pid; disown"
