@@ -1,0 +1,157 @@
+# SPDX-License-Identifier: MIT
+# Claude KVM — Mac Integration Test (Scaleway Apple Silicon)
+#
+# Pre-provisioned Scaleway Mac mini M1 with native macOS + ARD/VNC.
+# SSH tunnel ensures the remote IP never appears in logs.
+
+name: Mac Integration Test
+
+on:
+  push:
+    tags:
+      - 'mac-test-v*'
+
+env:
+  TZ: Europe/Istanbul
+  EXECUTOR_MODEL: claude-opus-4-6
+  OBSERVER_MODEL: qwen/qwen3-vl-235b-a22b-instruct
+  EXECUTOR_MAX_TURNS: '30'
+
+# ─────────────────────────────────────────────────────────────
+
+jobs:
+  integration-test:
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── SSH Tunnel ─────────────────────────────────────────
+
+      - name: Open SSH tunnel
+        env:
+          MAC_SSH_PRIVATE_KEY: ${{ secrets.MAC_SSH_PRIVATE_KEY }}
+          MAC_SSH_KEY_PASSPHRASE: ${{ secrets.MAC_SSH_KEY_PASSPHRASE }}
+          MAC_HOST: ${{ secrets.MAC_HOST }}
+          MAC_VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+        run: |
+          # Mask host IP in logs
+          echo "::add-mask::$MAC_HOST"
+
+          # Write SSH key
+          mkdir -p ~/.ssh
+          echo "$MAC_SSH_PRIVATE_KEY" > /tmp/mac_key
+          chmod 600 /tmp/mac_key
+
+          # Start ssh-agent with passphrase
+          eval "$(ssh-agent -s)"
+          DISPLAY=:0 SSH_ASKPASS_REQUIRE=force \
+            SSH_ASKPASS="$(mktemp /tmp/askpass.XXXXXX)" \
+            bash -c "
+              echo '#!/bin/sh' > \$SSH_ASKPASS
+              echo 'echo \"\$MAC_SSH_KEY_PASSPHRASE\"' >> \$SSH_ASKPASS
+              chmod +x \$SSH_ASKPASS
+              ssh-add /tmp/mac_key
+            "
+
+          # Open tunnel with control socket
+          ssh -fN \
+            -L 5901:localhost:${MAC_VNC_PORT:-5900} \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            -o ExitOnForwardFailure=yes \
+            -o ControlPath=/tmp/mac_ssh \
+            -o ControlMaster=yes \
+            -o ControlPersist=yes \
+            "${MAC_VNC_USERNAME}@${MAC_HOST}"
+
+          echo "Tunnel ready — localhost:5901"
+
+      # ── Screen Recording ───────────────────────────────────
+
+      - name: Start screen recording
+        run: |
+          MAC_SSH="ssh -S /tmp/mac_ssh placeholder"
+
+          $MAC_SSH "which ffmpeg || brew install ffmpeg" 2>/dev/null || true
+
+          # Try ffmpeg avfoundation
+          $MAC_SSH "nohup ffmpeg -f avfoundation -capture_cursor 1 -framerate 10 \
+            -i '1:none' -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
+            /tmp/recording.mp4 > /tmp/ffmpeg.log 2>&1 & echo \$! > /tmp/ffmpeg.pid" \
+            2>/dev/null
+
+          # Verify — fallback to screencapture if ffmpeg failed
+          sleep 2
+          RUNNING=$($MAC_SSH "kill -0 \$(cat /tmp/ffmpeg.pid 2>/dev/null) 2>/dev/null && echo yes || echo no" 2>/dev/null)
+
+          if [ "$RUNNING" != "yes" ]; then
+            echo "ffmpeg failed, trying screencapture..."
+            GUI_UID=$($MAC_SSH "id -u" 2>/dev/null)
+            $MAC_SSH "nohup sudo launchctl asuser ${GUI_UID} \
+              /usr/sbin/screencapture -v /tmp/recording.mov \
+              > /tmp/screencapture.log 2>&1 & echo \$! > /tmp/ffmpeg.pid" \
+              2>/dev/null || echo "Screen recording not available (non-fatal)"
+          fi
+
+      # ── Test Execution ─────────────────────────────────────
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install daemon
+        run: brew install ARAS-Workspace/tap/claude-kvm-daemon
+
+      - name: Run integration test
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          VNC_HOST: 127.0.0.1
+          VNC_PORT: '5901'
+          VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+          VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
+          CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
+          SCREENSHOTS_DIR: ./test-screenshots
+        run: |
+          mkdir -p test-screenshots
+          node test/integration.js
+
+      # ── Cleanup (always) ───────────────────────────────────
+
+      - name: Stop recording and download
+        if: always()
+        run: |
+          MAC_SSH="ssh -S /tmp/mac_ssh placeholder"
+
+          $MAC_SSH 'kill -INT $(cat /tmp/ffmpeg.pid 2>/dev/null) 2>/dev/null; sleep 3' || true
+
+          scp -o ControlPath=/tmp/mac_ssh \
+            placeholder:/tmp/recording.mp4 \
+            ./test-screenshots/recording.mp4 2>/dev/null || \
+          scp -o ControlPath=/tmp/mac_ssh \
+            placeholder:/tmp/recording.mov \
+            ./test-screenshots/recording.mov 2>/dev/null || \
+          echo "No recording file"
+
+      - name: Close tunnel
+        if: always()
+        run: |
+          ssh -S /tmp/mac_ssh -O exit placeholder 2>/dev/null || true
+          rm -f /tmp/mac_key
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts-mac
+          path: test-screenshots/
+          if-no-files-found: ignore
