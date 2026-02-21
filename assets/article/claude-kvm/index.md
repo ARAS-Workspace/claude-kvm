@@ -2,8 +2,8 @@
 
 Claude KVM is an MCP tool that controls remote desktop environments over VNC. It consists of a thin JS proxy layer (MCP server) and a platform-native Swift VNC daemon running on your macOS system.
 
-[![Claude KVM Demo](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/linux/demo-run-22261661594.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README.md)
-[![Claude KVM Demo Mac](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/mac/demo-mac-run-22261487249.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/test/e2e/mac/test/README.md)
+[![Claude KVM Demo](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/article/claude-kvm/assets/demo-linux.png)](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README.md)
+[![Claude KVM Demo Mac](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/article/claude-kvm/assets/demo-mac.png)](https://github.com/ARAS-Workspace/claude-kvm/blob/test/e2e/mac/test/README.md)
 
 ## Live Test Runs
 
@@ -13,10 +13,10 @@ Claude KVM is an MCP tool that controls remote desktop environments over VNC. It
 - [Mac Scientific Calculator Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261184519)
 - [Mac Safari Browsing Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261430282)
 
-> [!NOTE]
+> **Note:**
 > Tests are conducted transparently on GitHub Actions — each step is visible in the CI environment. At the end of every test, whether the integration passes or fails, you'll find screenshots of each step the agent took during the session, along with an `.mp4` video recording that captures the entire session. By reviewing these recordings and screenshots, you can observe how the agent progressed through each stage, how long the task took, and what decisions were made based on the system prompt. You can use these examples as a reference when crafting your own system prompts or instructions for the MCP server in your own environment.
 
-> [!WARNING]
+> **Warning:**
 > Artifacts attached to these runs may have expired due to GitHub's artifact retention policy. Persistent copies are prepared via the [Persist Artifacts](https://github.com/ARAS-Workspace/claude-kvm/actions/workflows/persist-artifacts.yml) workflow and can always be accessed by run ID from the [`artifacts/`](https://github.com/ARAS-Workspace/claude-kvm/tree/press-kit/artifacts) directory on the press-kit branch.
 
 ## Architecture
@@ -81,7 +81,7 @@ brew tap ARAS-Workspace/tap
 brew install claude-kvm-daemon
 ```
 
-> [!NOTE]
+> **Note:**
 > `claude-kvm-daemon` is compiled and code-signed via CI (GitHub Actions). The build output is packaged in two formats: a `.tar.gz` archive for Homebrew distribution and a `.dmg` disk image for notarization. The DMG is submitted to Apple servers for notarization within the same workflow — the process can be tracked from CI logs. The notarized DMG is available as a CI Artifact; the archived `.tar.gz` is also published as a release on the repository. Homebrew installation tracks this release.
 >
 > - [Release](https://github.com/ARAS-Workspace/claude-kvm/releases/tag/daemon-v1.0.1) · [Source Code](https://github.com/ARAS-Workspace/claude-kvm/tree/daemon-tool)
@@ -111,7 +111,7 @@ Create a `.mcp.json` file in your project directory:
 }
 ```
 
-> [!NOTE]
+> **Note:**
 > The tool is end-to-end tested via CI — Claude executes tasks over VNC while an independent vision model observes and verifies the results. See the [Integration Test](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README.md) for live workflow runs, system prompts, and demo recordings.
 
 ### Configuration

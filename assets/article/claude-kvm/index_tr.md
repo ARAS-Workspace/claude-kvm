@@ -2,8 +2,8 @@
 
 Claude KVM, VNC protokolü üzerinden uzak masaüstü ortamlarını kontrol eden bir MCP aracıdır. İnce bir JS proxy katmanı (MCP server) ve MacOS sisteminizde çalışan platformunuza native bir Swift VNC daemon'dan oluşur.
 
-[![Claude KVM Demo](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/linux/demo-run-22261661594.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README_TR.md)
-[![Claude KVM Demo Mac](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/mac/demo-mac-run-22261487249.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/test/e2e/mac/test/README_TR.md)
+[![Claude KVM Demo](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/article/claude-kvm/assets/demo-linux.png)](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README_TR.md)
+[![Claude KVM Demo Mac](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/article/claude-kvm/assets/demo-mac.png)](https://github.com/ARAS-Workspace/claude-kvm/blob/test/e2e/mac/test/README_TR.md)
 
 
 ## Canlı Test Ortamı
@@ -14,10 +14,10 @@ Claude KVM, VNC protokolü üzerinden uzak masaüstü ortamlarını kontrol eden
 - [Mac Scientific Calculator Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261184519)
 - [Mac Safari Browsing Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261430282)
 
-> [!NOTE]
+> **Not:**
 > Testler GitHub Actions üzerinde CI ortamında şeffaf biçimde yürütülmektedir — her adım aşama aşama görülebilir. Her testin sonunda, entegrasyon başarılı ya da başarısız olsun, ajanın oturum boyunca attığı her adımın ekran görüntüleri ve oturumun tamamını yansıtan `.mp4` video kaydı yer almaktadır. Bu kayıtları ve görüntüleri inceleyerek ajanın sistem komutundaki görevi hangi aşamalardan geçerek ne kadar sürede tamamladığını gözlemleyebilir, MCP sunucusunu kendi ortamınızda kullanırken buradaki örneklerden faydalanarak sistem komutunuzu veya talimatlarınızı şekillendirebilirsiniz.
 
-> [!WARNING]
+> **Uyarı:**
 > Bu çalıştırmalara ait artifact'ların süresi GitHub'ın artifact saklama politikası nedeniyle dolmuş olabilir. Kalıcı kopyalar [Persist Artifacts](https://github.com/ARAS-Workspace/claude-kvm/actions/workflows/persist-artifacts.yml) workflow'u aracılığıyla hazırlanmıştır ve run ID ile press-kit branch'indeki [`artifacts/`](https://github.com/ARAS-Workspace/claude-kvm/tree/press-kit/artifacts) dizininden her zaman erişilebilir.
 
 ## Mimari
@@ -82,7 +82,7 @@ brew tap ARAS-Workspace/tap
 brew install claude-kvm-daemon
 ```
 
-> [!NOTE]
+> **Not:**
 > `claude-kvm-daemon`, CI (GitHub Actions) üzerinde derlenir ve code-sign edilir. Derleme çıktısı iki formatta paketlenir: Homebrew dağıtımı için `.tar.gz` arşivi ve notarizasyon için `.dmg` disk imajı. DMG paketi aynı akış içerisinde Apple sunucularına gönderilir ve notarize edilir — süreç CI loglarından takip edilebilir. Notarize edilmiş DMG, CI Artifacts üzerinde yer alır; arşivlenen `.tar.gz` ise repo üzerinde release olarak da yayınlanır. Homebrew kurulumu bu release'i takip eder.
 >
 > - [Release](https://github.com/ARAS-Workspace/claude-kvm/releases/tag/daemon-v1.0.1) · [Kaynak Kod](https://github.com/ARAS-Workspace/claude-kvm/tree/daemon-tool)
@@ -112,7 +112,7 @@ Proje dizinine `.mcp.json` dosyası oluşturun:
 }
 ```
 
-> [!NOTE]
+> **Not:**
 > Araç, CI üzerinden uçtan uca test edilmektedir — Claude, VNC üzerinden görevleri yürütürken bağımsız bir görüş modeli sonuçları gözlemleyip doğrular. Canlı workflow çalıştırmaları, sistem komutları ve demo kayıtları için [Entegrasyon Testi](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README_TR.md) sayfasına bakınız.
 
 ### Yapılandırma
