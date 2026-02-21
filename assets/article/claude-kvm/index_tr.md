@@ -2,6 +2,8 @@
 
 Claude KVM, VNC protokolü üzerinden uzak masaüstü ortamlarını kontrol eden bir MCP aracıdır. İnce bir JS proxy katmanı (MCP server) ve MacOS sisteminizde çalışan platformunuza native bir Swift VNC daemon'dan oluşur.
 
+**GitHub:** [ARAS-Workspace/claude-kvm](https://github.com/ARAS-Workspace/claude-kvm)
+
 [![Claude KVM Demo](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/article/claude-kvm/assets/demo-linux.png)](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README_TR.md)
 [![Claude KVM Demo Mac](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/article/claude-kvm/assets/demo-mac.png)](https://github.com/ARAS-Workspace/claude-kvm/blob/test/e2e/mac/test/README_TR.md)
 
