@@ -58,16 +58,7 @@ jobs:
       # ── Screen Recording ───────────────────────────────────
 
       - name: Start screen recording
-        run: |
-          ssh -S /tmp/mac_ssh placeholder bash -s << 'REMOTE'
-          ffmpeg -f avfoundation -capture_cursor 1 -framerate 10 \
-            -i '0:none' -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
-            /tmp/recording.mp4 </dev/null >/tmp/ffmpeg.log 2>&1 &
-          echo $! > /tmp/ffmpeg.pid
-          disown
-          sleep 2
-          kill -0 $(cat /tmp/ffmpeg.pid) 2>/dev/null && echo "Recording started" || echo "Recording failed"
-          REMOTE
+        run: python3 scripts/record.py start
 
       # ── Test Execution ─────────────────────────────────────
 
@@ -102,10 +93,7 @@ jobs:
       - name: Stop recording and download
         if: always()
         run: |
-          MAC_SSH="ssh -S /tmp/mac_ssh placeholder"
-
-          $MAC_SSH 'kill -INT $(cat /tmp/ffmpeg.pid 2>/dev/null) 2>/dev/null; sleep 3' || true
-
+          python3 scripts/record.py stop || true
           scp -o ControlPath=/tmp/mac_ssh \
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/recording.mp4 2>/dev/null || \
