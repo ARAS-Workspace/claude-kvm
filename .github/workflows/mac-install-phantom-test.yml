@@ -94,6 +94,7 @@ jobs:
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
+          CLAUDE_KVM_DAEMON_PARAMETERS: "-v"
           SCREENSHOTS_DIR: ./test-screenshots
           EXECUTOR_MODEL: ${{ inputs.executor_model }}
           OBSERVER_MODEL: ${{ inputs.observer_model }}
