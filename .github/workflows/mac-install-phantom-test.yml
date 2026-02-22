@@ -4,7 +4,7 @@
 # Manual trigger — pre-provisioned Scaleway Mac mini M1.
 # Test code lives on test/e2e/mac branch.
 # 4-phase installation: Download → Install → Launch → Verify
-# SSH tunnel for VNC stability + caffeinate to prevent sleep (#8)
+# ARD restart between phases for VNC stability + caffeinate (#8)
 
 name: Mac Phantom-WG Install Test
 
@@ -49,19 +49,16 @@ jobs:
           printf '%s\n' "$MAC_SSH_PRIVATE_KEY" > /tmp/mac_key
           chmod 600 /tmp/mac_key
 
-      - name: SSH connect + VNC tunnel
+      - name: SSH connect
         env:
           MAC_HOST: ${{ secrets.MAC_HOST }}
           MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
-          MAC_VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
         run: |
           ssh -fN \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             -o LogLevel=ERROR -o ControlPath=/tmp/mac_ssh \
             -o ControlMaster=yes -o ControlPersist=yes \
-            -L 5901:localhost:${MAC_VNC_PORT} \
             -i /tmp/mac_key "${MAC_VNC_USERNAME}@${MAC_HOST}"
-          echo "SSH tunnel ready (localhost:5901 → remote:${MAC_VNC_PORT})"
           ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
 
       - name: Setup Node.js
@@ -91,8 +88,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: localhost
-          VNC_PORT: '5901'
+          VNC_HOST: ${{ secrets.MAC_HOST }}
+          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
@@ -114,12 +111,14 @@ jobs:
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/phase-1/recording.mp4 2>/dev/null || echo "No recording"
 
-      - name: "[1/4] Reset desktop"
+      - name: "[1/4] Reset desktop & restart ARD"
         run: |
           ssh -S /tmp/mac_ssh placeholder "
             osascript -e 'quit app \"Safari\"' 2>/dev/null
             osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
+            sudo launchctl kickstart -k system/com.apple.screensharing
           " || true
+          sleep 5
 
       # ════════════════════════════════════════════════════════════
       # Phase 2: Install
@@ -137,8 +136,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: localhost
-          VNC_PORT: '5901'
+          VNC_HOST: ${{ secrets.MAC_HOST }}
+          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
@@ -160,11 +159,13 @@ jobs:
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/phase-2/recording.mp4 2>/dev/null || echo "No recording"
 
-      - name: "[2/4] Reset desktop"
+      - name: "[2/4] Reset desktop & restart ARD"
         run: |
           ssh -S /tmp/mac_ssh placeholder "
             osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
+            sudo launchctl kickstart -k system/com.apple.screensharing
           " || true
+          sleep 5
 
       # ════════════════════════════════════════════════════════════
       # Phase 3: Launch
@@ -182,8 +183,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: localhost
-          VNC_PORT: '5901'
+          VNC_HOST: ${{ secrets.MAC_HOST }}
+          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
@@ -205,12 +206,14 @@ jobs:
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/phase-3/recording.mp4 2>/dev/null || echo "No recording"
 
-      - name: "[3/4] Reset desktop"
+      - name: "[3/4] Reset desktop & restart ARD"
         run: |
           ssh -S /tmp/mac_ssh placeholder "
             osascript -e 'quit app \"Phantom-WG\"' 2>/dev/null
             osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
+            sudo launchctl kickstart -k system/com.apple.screensharing
           " || true
+          sleep 5
 
       # ════════════════════════════════════════════════════════════
       # Phase 4: Verify
@@ -228,8 +231,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: localhost
-          VNC_PORT: '5901'
+          VNC_HOST: ${{ secrets.MAC_HOST }}
+          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
