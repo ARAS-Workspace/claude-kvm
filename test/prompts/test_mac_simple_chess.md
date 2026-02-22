@@ -42,12 +42,18 @@ Open the built-in Chess app, play a short game by moving pieces using click inte
 5. After completing 4 moves, use detect_elements to capture the final board state
 6. Call task_complete()
 
+## How to Move a Piece
+
+Moving a piece is a two-click process — NO dragging required:
+1. **First click** — click on the piece you want to move. Green circles will appear on all valid destination squares.
+2. **Second click** — click on one of the green circle squares to complete the move. The piece will jump there automatically.
+
 ## Rules
 
 - Use detect_elements before every click action — the board changes after each move
-- After clicking a piece, wait for green circles to appear, then use detect_elements to find valid destinations
+- After clicking a piece, use detect_elements to find the green circles (valid destinations), then click the target square
+- Do NOT drag pieces — just click source, then click destination
 - Use action_queue to batch actions where possible
 - Use wait(2000) after each move to let the computer (Black) respond
 - If a piece click doesn't show valid moves, re-run detect_elements and retry
-- Do NOT try to type moves — all interaction is mouse-click based
 - The computer plays Black automatically — just wait for its response
