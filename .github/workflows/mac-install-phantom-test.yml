@@ -4,7 +4,7 @@
 # Manual trigger — pre-provisioned Scaleway Mac mini M1.
 # Test code lives on test/e2e/mac branch.
 # 4-phase installation: Download → Install → Launch → Verify
-# ARD watchdog (restart only if dead) during tests + caffeinate (#8)
+# ARD watchdog (process + port health check) during tests + caffeinate (#8)
 
 name: Mac Phantom-WG Install Test
 
@@ -80,7 +80,7 @@ jobs:
         run: |
           ssh -S /tmp/mac_ssh placeholder \
             "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
-          ssh -S /tmp/mac_ssh placeholder "nohup bash -c 'while true; do pgrep -q screensharingd || sudo launchctl kickstart system/com.apple.screensharing; sleep 30; done' >/dev/null 2>&1 & echo \$! > /tmp/ard-keepalive.pid"
+          ssh -S /tmp/mac_ssh placeholder "nohup bash -c 'while true; do if ! pgrep -q screensharingd || ! nc -z -w 3 localhost 5900 2>/dev/null; then sudo launchctl kickstart -k system/com.apple.screensharing; fi; sleep 30; done' >/dev/null 2>&1 & echo \$! > /tmp/ard-keepalive.pid"
           python3 scripts/record.py start
 
       - name: "[1/4] Run Download phase"
@@ -128,7 +128,7 @@ jobs:
         run: |
           ssh -S /tmp/mac_ssh placeholder \
             "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
-          ssh -S /tmp/mac_ssh placeholder "nohup bash -c 'while true; do pgrep -q screensharingd || sudo launchctl kickstart system/com.apple.screensharing; sleep 30; done' >/dev/null 2>&1 & echo \$! > /tmp/ard-keepalive.pid"
+          ssh -S /tmp/mac_ssh placeholder "nohup bash -c 'while true; do if ! pgrep -q screensharingd || ! nc -z -w 3 localhost 5900 2>/dev/null; then sudo launchctl kickstart -k system/com.apple.screensharing; fi; sleep 30; done' >/dev/null 2>&1 & echo \$! > /tmp/ard-keepalive.pid"
           python3 scripts/record.py start
 
       - name: "[2/4] Run Install phase"
@@ -175,7 +175,7 @@ jobs:
         run: |
           ssh -S /tmp/mac_ssh placeholder \
             "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
-          ssh -S /tmp/mac_ssh placeholder "nohup bash -c 'while true; do pgrep -q screensharingd || sudo launchctl kickstart system/com.apple.screensharing; sleep 30; done' >/dev/null 2>&1 & echo \$! > /tmp/ard-keepalive.pid"
+          ssh -S /tmp/mac_ssh placeholder "nohup bash -c 'while true; do if ! pgrep -q screensharingd || ! nc -z -w 3 localhost 5900 2>/dev/null; then sudo launchctl kickstart -k system/com.apple.screensharing; fi; sleep 30; done' >/dev/null 2>&1 & echo \$! > /tmp/ard-keepalive.pid"
           python3 scripts/record.py start
 
       - name: "[3/4] Run Launch phase"
@@ -223,7 +223,7 @@ jobs:
         run: |
           ssh -S /tmp/mac_ssh placeholder \
             "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
-          ssh -S /tmp/mac_ssh placeholder "nohup bash -c 'while true; do pgrep -q screensharingd || sudo launchctl kickstart system/com.apple.screensharing; sleep 30; done' >/dev/null 2>&1 & echo \$! > /tmp/ard-keepalive.pid"
+          ssh -S /tmp/mac_ssh placeholder "nohup bash -c 'while true; do if ! pgrep -q screensharingd || ! nc -z -w 3 localhost 5900 2>/dev/null; then sudo launchctl kickstart -k system/com.apple.screensharing; fi; sleep 30; done' >/dev/null 2>&1 & echo \$! > /tmp/ard-keepalive.pid"
           python3 scripts/record.py start
 
       - name: "[4/4] Run Verify phase"
