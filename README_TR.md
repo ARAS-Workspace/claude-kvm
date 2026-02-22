@@ -1,7 +1,5 @@
 # Claude KVM
 
-[![MCP Badge](https://lobehub.com/badge/mcp/aras-workspace-claude-kvm?style=flat)](https://lobehub.com/mcp/aras-workspace-claude-kvm)
-
 Claude KVM, VNC protokolü üzerinden uzak masaüstü ortamlarını kontrol eden bir MCP aracıdır. İnce bir JS proxy katmanı (MCP server) ve MacOS sisteminizde çalışan platformunuza native bir Swift VNC daemon'dan oluşur.
 
 [![Claude KVM Demo](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/linux/demo-run-22261661594.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README_TR.md)
@@ -340,5 +338,7 @@ Desteklenen VNC kimlik doğrulama yöntemleri:
 macOS, ARD auth type 30 kimlik bilgisi isteği üzerinden otomatik algılanır. Algılandığında Meta tuşları Super'e yeniden eşlenir (Command tuşu uyumluluğu).
 
 ---
+
+[![MCP Badge](https://lobehub.com/badge/mcp/aras-workspace-claude-kvm?style=flat)](https://lobehub.com/mcp/aras-workspace-claude-kvm)
 
 Copyright (c) 2026 Rıza Emre ARAS — MIT Lisansı
