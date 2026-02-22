@@ -1,15 +1,17 @@
 # Download
 
-Open Safari, navigate to the Phantom-WG GitHub releases page, and download the DMG installer.
+Search for Phantom-WG on Google, find the GitHub repository, and download the DMG installer from releases.
 
 1. Open Safari — use Spotlight (Cmd+Space), type "Safari", press Return
-2. Click the address bar (Cmd+L), type "https://github.com/ARAS-Workspace/phantom-wg" using key_type, press Return
-3. Wait for the page to load, use detect_elements to find "Releases" on the right sidebar and click it
-4. On the releases page, find "Phantom-WG Mac 1.0.0" and click it
-5. Scroll down (key_tap "pagedown") to reach the Assets section at the bottom of the release page
-6. Find the `.dmg` file in the Assets list and click it to start downloading
-7. Wait for the download to complete — check Safari's downloads indicator (View > Show Downloads)
-8. Verify the DMG file is fully downloaded, then call task_complete()
+2. Click the address bar (Cmd+L), type "google.com" using key_type, press Return
+3. In the Google search bar, type "Phantom-WG" and press Return
+4. Use detect_elements to find the GitHub link (github.com/ARAS-Workspace/phantom-wg) in the results and click it
+5. On the GitHub page, scroll down (key_tap "pagedown") until you find "Releases" on the right sidebar, then click it
+6. On the releases page, find "Phantom-WG Mac 1.0.0" and click it
+7. Scroll down (key_tap "pagedown") to reach the Assets section at the bottom of the release page
+8. Find the `.dmg` file in the Assets list and click it to start downloading
+9. Wait for the download to complete — check Safari's downloads indicator (View > Show Downloads)
+10. Verify the DMG file is fully downloaded, then call task_complete()
 
 Rules:
 - Use detect_elements (not screenshot) to find clickable targets
