@@ -4,56 +4,71 @@ Complete the following task on the macOS desktop:
 
 ## Goal
 
-Open the built-in Chess app, play a short game by moving pieces using click interactions, and verify moves via OCR.
+Open the built-in Chess app and play a short game (4 white moves).
 
-## Steps
+## How the Chess App Works
+
+This is a 3D board. Moving a piece is a **two-click** process:
+1. **Click on a piece** — white concentric rings will appear around the base of the piece, confirming it is selected. Valid destination squares will also show subtle highlights.
+2. **Click on the destination square** — the piece moves there automatically.
+
+**Important**: The selection indicator is **white rings** around the piece base, NOT green circles. After clicking a piece, use `cursor_crop` centered on the piece to verify the white rings appeared. Do NOT drag pieces.
+
+## Setup
 
 1. Open Chess — use Spotlight (Cmd+Space), type "Chess", press Return
-2. Wait for the app to open — use wait(2000) then detect_elements to confirm the board is visible
-3. Chess may ask to start a new game or show a dialog — if so, accept/start a new game
-4. You are playing as White (bottom side). Play the following 4 moves:
+2. Wait for the app — use wait(3000) then screenshot to confirm the board is visible
+3. Enable Edge Notation — click View menu, then click "Edge Notation" so column letters (A–H) and row numbers (1–8) appear on the board edges
+4. If a "Game Center" dialog or notification appears, dismiss it by pressing Escape
+5. Use detect_elements to read the edge labels and map the board grid
 
-### Move 1 — King's Pawn Opening
-- Use detect_elements to find the white pawn on e2 (column 5, row 7 from top)
-- Click the pawn — green circles will appear showing valid destination squares
-- Use detect_elements to identify the valid move circles
-- Click the e4 square (two squares forward) to complete the move
-- Use wait(2000) for Black's response
+## Board Coordinate Strategy
 
-### Move 2 — King's Knight
-- Use detect_elements to find the board state after Black's move
-- Click the white knight on g1 (column 7, row 8 from top)
-- Green circles will appear — click the f3 square to move the knight
-- Use wait(2000) for Black's response
+The board is in 3D perspective — column positions shift per row. Use this approach:
+- Read the **row numbers** (1–8) on the left edge via detect_elements — their y-coordinates give you each row's vertical center
+- Read the **column letters** (A–H) on the bottom edge — their x-coordinates give you column centers at the bottom
+- For rows higher up the board, columns compress toward center due to perspective
+- After mapping, use `cursor_crop` on a piece to visually confirm you are targeting the right square before clicking
 
-### Move 3 — King's Bishop
-- Use detect_elements to find the board state
-- Click the white bishop on f1 (column 6, row 8 from top)
-- Green circles will appear — click the c4 square (diagonal to upper-left) to move the bishop
-- Use wait(2000) for Black's response
+## Moves
 
-### Move 4 — Queen Attack
-- Use detect_elements to find the board state
-- Click the white queen on d1 (column 4, row 8 from top)
-- Green circles will appear — look for an aggressive square (h5 or f7 if available)
-- Click the best available forward square for the queen
-- Use wait(2000) for Black's response
+Play these 4 moves as White (bottom side):
 
-5. After completing 4 moves, use detect_elements to capture the final board state
-6. Call task_complete()
+### Move 1 — e2 to e4
+- Find the e2 pawn using your coordinate map (column E, row 2)
+- Click it — verify selection with cursor_crop (white rings visible)
+- Click the e4 square (column E, row 4) to complete the move
+- wait(3000) for Black's response
 
-## How to Move a Piece
+### Move 2 — Knight g1 to f3
+- detect_elements to read updated board
+- Click the knight on g1 (column G, row 1) — verify selection with cursor_crop
+- Click f3 (column F, row 3)
+- wait(3000) for Black's response
 
-Moving a piece is a two-click process — NO dragging required:
-1. **First click** — click on the piece you want to move. Green circles will appear on all valid destination squares.
-2. **Second click** — click on one of the green circle squares to complete the move. The piece will jump there automatically.
+### Move 3 — Bishop f1 to c4
+- detect_elements to read updated board
+- Click the bishop on f1 (column F, row 1) — verify selection with cursor_crop
+- Click c4 (column C, row 4)
+- wait(3000) for Black's response
+
+### Move 4 — Queen d1 to h5
+- detect_elements to read updated board
+- Click the queen on d1 (column D, row 1) — verify selection with cursor_crop
+- Click h5 (column H, row 5) — if blocked, click the best available forward square
+- wait(3000) for Black's response
+
+## Finish
+
+After 4 moves, take a screenshot of the final board state, then call task_complete().
 
 ## Rules
 
-- Use detect_elements before every click action — the board changes after each move
-- After clicking a piece, use detect_elements to find the green circles (valid destinations), then click the target square
-- Do NOT drag pieces — just click source, then click destination
-- Use action_queue to batch actions where possible
-- Use wait(2000) after each move to let the computer (Black) respond
-- If a piece click doesn't show valid moves, re-run detect_elements and retry
-- The computer plays Black automatically — just wait for its response
+- Enable Edge Notation FIRST — do not attempt moves without coordinate labels
+- Use detect_elements to read edge labels and map the grid before your first move
+- After clicking a piece, ALWAYS use cursor_crop to verify white rings appeared (piece selected)
+- If no white rings appear, you clicked the wrong spot — re-check coordinates and retry
+- Do NOT drag pieces — click source, then click destination
+- Do NOT use screenshot to find pieces — use your coordinate map from edge labels
+- Use wait(3000) after each move to let Black respond
+- If you accidentally enter "Edited" mode, press Cmd+Z to undo, then Cmd+N for a new game
