@@ -5,6 +5,8 @@ Claude KVM, VNC protokolü üzerinden uzak masaüstü ortamlarını kontrol eden
 [![Claude KVM Demo](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/linux/demo-run-22261661594.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README_TR.md)
 [![Claude KVM Demo Mac](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/mac/demo-mac-run-22261487249.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/test/e2e/mac/test/README_TR.md)
 
+> [!TIP]
+> **[Phantom-WG](https://www.phantom.tc) sizin için iyi bir alternatif olabilir.** VNC sunucunuzu kendi ağınızda dışarıya karşı izole ederken ekstra kazandığınız gizlilik özellikleriyle self-hosted VPN performansının tadını çıkarın.
 
 ## Canlı Test Ortamı
 

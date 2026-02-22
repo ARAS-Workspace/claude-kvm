@@ -5,6 +5,9 @@ Claude KVM is an MCP tool that controls remote desktop environments over VNC. It
 [![Claude KVM Demo](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/linux/demo-run-22261661594.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README.md)
 [![Claude KVM Demo Mac](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/mac/demo-mac-run-22261487249.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/test/e2e/mac/test/README.md)
 
+> [!TIP]
+> **[Phantom-WG](https://www.phantom.tc) could be a great alternative for you.** Isolate your VNC server within your own network while enjoying self-hosted VPN performance with the extra privacy features you gain along the way.
+
 ## Live Test Runs
 
 - [Integration Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261661594)
