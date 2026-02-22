@@ -4,7 +4,7 @@
 # Manual trigger — pre-provisioned Scaleway Mac mini M1.
 # Test code lives on test/e2e/mac branch.
 # 4-phase installation: Download → Install → Launch → Verify
-# Single SSH + caffeinate, clean run on Tahoe (#8)
+# VNC via SSH tunnel to avoid brute-force auth degradation.
 
 name: Mac Phantom-WG Install Test
 
@@ -49,17 +49,19 @@ jobs:
           printf '%s\n' "$MAC_SSH_PRIVATE_KEY" > /tmp/mac_key
           chmod 600 /tmp/mac_key
 
-      - name: SSH connect
+      - name: SSH connect + VNC tunnel
         env:
           MAC_HOST: ${{ secrets.MAC_HOST }}
           MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
         run: |
           ssh -fN \
+            -L 5901:localhost:5900 \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             -o LogLevel=ERROR -o ControlPath=/tmp/mac_ssh \
             -o ControlMaster=yes -o ControlPersist=yes \
             -i /tmp/mac_key "${MAC_VNC_USERNAME}@${MAC_HOST}"
           ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
+          echo "SSH + VNC tunnel ready (localhost:5901)"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -88,8 +90,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: ${{ secrets.MAC_HOST }}
-          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+          VNC_HOST: localhost
+          VNC_PORT: '5901'
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
@@ -134,8 +136,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: ${{ secrets.MAC_HOST }}
-          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+          VNC_HOST: localhost
+          VNC_PORT: '5901'
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
@@ -179,8 +181,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: ${{ secrets.MAC_HOST }}
-          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+          VNC_HOST: localhost
+          VNC_PORT: '5901'
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
@@ -225,8 +227,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: ${{ secrets.MAC_HOST }}
-          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+          VNC_HOST: localhost
+          VNC_PORT: '5901'
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
