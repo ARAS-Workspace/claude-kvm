@@ -1,0 +1,139 @@
+# SPDX-License-Identifier: MIT
+# Claude KVM — Mac Chess Direct Test (Scaleway Apple Silicon)
+#
+# Manual trigger — pre-provisioned Scaleway Mac mini M1.
+# Chess app must be manually pre-opened on the remote Mac before running.
+# VNC via SSH tunnel to avoid brute-force auth degradation.
+# Test code lives on test/e2e/mac branch.
+
+name: Mac Chess Direct Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      executor_model:
+        description: 'Executor model'
+        default: 'claude-opus-4-6'
+      observer_model:
+        description: 'Observer model'
+        default: 'qwen/qwen3-vl-235b-a22b-instruct'
+      max_turns:
+        description: 'Max executor turns'
+        default: '30'
+
+# ─────────────────────────────────────────────────────────────
+
+jobs:
+  chess-direct-test:
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    env:
+      TZ: Europe/Istanbul
+
+    steps:
+      - name: Checkout test branch
+        uses: actions/checkout@v4
+        with:
+          ref: test/e2e/mac
+
+      # ── SSH Setup ──────────────────────────────────────────
+
+      - name: Setup SSH + VNC tunnel
+        env:
+          MAC_SSH_PRIVATE_KEY: ${{ secrets.MAC_SSH_PRIVATE_KEY }}
+          MAC_HOST: ${{ secrets.MAC_HOST }}
+          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+        run: |
+          echo "::add-mask::$MAC_HOST"
+
+          mkdir -p ~/.ssh
+          printf '%s\n' "$MAC_SSH_PRIVATE_KEY" > /tmp/mac_key
+          chmod 600 /tmp/mac_key
+
+          # SSH control socket + VNC tunnel (5901 → localhost:5900)
+          ssh -fN \
+            -L 5901:localhost:5900 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            -o ControlPath=/tmp/mac_ssh \
+            -o ControlMaster=yes \
+            -o ControlPersist=yes \
+            -i /tmp/mac_key \
+            "${MAC_VNC_USERNAME}@${MAC_HOST}"
+
+          ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
+          echo "SSH + VNC tunnel ready (localhost:5901)"
+
+      # ── Screen Recording ───────────────────────────────────
+
+      - name: Cleanup remote recordings
+        run: |
+          ssh -S /tmp/mac_ssh placeholder \
+            "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
+
+      - name: Start screen recording
+        run: python3 scripts/record.py start
+
+      # ── Test Execution ─────────────────────────────────────
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install daemon
+        run: brew install ARAS-Workspace/tap/claude-kvm-daemon
+
+      - name: Run chess direct test (via tunnel)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          VNC_HOST: localhost
+          VNC_PORT: '5901'
+          VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+          VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
+          CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
+          SCREENSHOTS_DIR: ./test-screenshots
+          EXECUTOR_MODEL: ${{ inputs.executor_model }}
+          OBSERVER_MODEL: ${{ inputs.observer_model }}
+          EXECUTOR_MAX_TURNS: ${{ inputs.max_turns }}
+        run: |
+          mkdir -p test-screenshots
+          node test/test.js prompts/test_mac_simple_chess_direct.md
+
+      # ── Cleanup (always) ───────────────────────────────────
+
+      - name: Stop recording and download
+        if: always()
+        run: |
+          python3 scripts/record.py stop || true
+          scp -o ControlPath=/tmp/mac_ssh \
+            placeholder:/tmp/recording.mp4 \
+            ./test-screenshots/recording.mp4 2>/dev/null || \
+          echo "No recording file"
+
+      - name: Reset remote desktop
+        if: always()
+        run: |
+          ssh -S /tmp/mac_ssh placeholder "
+            osascript -e 'tell app \"Chess\" to quit' 2>/dev/null
+          " || true
+
+      - name: Close SSH
+        if: always()
+        run: |
+          ssh -S /tmp/mac_ssh -O exit placeholder 2>/dev/null || true
+          rm -f /tmp/mac_key
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts-chess-direct
+          path: test-screenshots/
+          if-no-files-found: ignore
