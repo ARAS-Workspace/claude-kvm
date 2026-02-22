@@ -101,7 +101,8 @@ jobs:
         run: |
           echo "::add-mask::$VNC_HOST"
           mkdir -p test-screenshots/phase-1
-          awk '/^# Download$/,/^# [A-Z]/' "$PROMPT_FILE" | sed '1d;$d' > /tmp/phase-prompt.md
+          awk '/^# Download$/{f=1;next} /^# [A-Z]/{if(f)exit} f' "$PROMPT_FILE" > /tmp/phase-prompt.md
+          cat /tmp/phase-prompt.md
           node test/test.js /tmp/phase-prompt.md
 
       - name: "[1/4] Stop recording & download"
@@ -171,7 +172,8 @@ jobs:
         run: |
           echo "::add-mask::$VNC_HOST"
           mkdir -p test-screenshots/phase-2
-          awk '/^# Install$/,/^# [A-Z]/' "$PROMPT_FILE" | sed '1d;$d' > /tmp/phase-prompt.md
+          awk '/^# Install$/{f=1;next} /^# [A-Z]/{if(f)exit} f' "$PROMPT_FILE" > /tmp/phase-prompt.md
+          cat /tmp/phase-prompt.md
           node test/test.js /tmp/phase-prompt.md
 
       - name: "[2/4] Stop recording & download"
@@ -240,7 +242,8 @@ jobs:
         run: |
           echo "::add-mask::$VNC_HOST"
           mkdir -p test-screenshots/phase-3
-          awk '/^# Launch$/,/^# [A-Z]/' "$PROMPT_FILE" | sed '1d;$d' > /tmp/phase-prompt.md
+          awk '/^# Launch$/{f=1;next} /^# [A-Z]/{if(f)exit} f' "$PROMPT_FILE" > /tmp/phase-prompt.md
+          cat /tmp/phase-prompt.md
           node test/test.js /tmp/phase-prompt.md
 
       - name: "[3/4] Stop recording & download"
@@ -310,7 +313,8 @@ jobs:
         run: |
           echo "::add-mask::$VNC_HOST"
           mkdir -p test-screenshots/phase-4
-          awk '/^# Verify$/,0' "$PROMPT_FILE" | sed '1d' > /tmp/phase-prompt.md
+          awk '/^# Verify$/{f=1;next} f' "$PROMPT_FILE" > /tmp/phase-prompt.md
+          cat /tmp/phase-prompt.md
           node test/test.js /tmp/phase-prompt.md
 
       - name: "[4/4] Stop recording & download"
