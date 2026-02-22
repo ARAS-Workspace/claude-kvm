@@ -4,7 +4,7 @@
 # Manual trigger — pre-provisioned Scaleway Mac mini M1.
 # Test code lives on test/e2e/mac branch.
 # 4-phase installation: Download → Install → Launch → Verify
-# ARD restart between phases for VNC stability + caffeinate (#8)
+# ARD keepalive (30s restart loop) during tests + caffeinate (#8)
 
 name: Mac Phantom-WG Install Test
 
@@ -80,6 +80,7 @@ jobs:
         run: |
           ssh -S /tmp/mac_ssh placeholder \
             "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
+          ssh -S /tmp/mac_ssh placeholder "nohup bash -c 'while true; do sudo launchctl kickstart -k system/com.apple.screensharing 2>/dev/null; sleep 30; done' >/dev/null 2>&1 & echo \$! > /tmp/ard-keepalive.pid"
           python3 scripts/record.py start
 
       - name: "[1/4] Run Download phase"
@@ -106,19 +107,18 @@ jobs:
 
       - name: "[1/4] Stop recording & download"
         run: |
+          ssh -S /tmp/mac_ssh placeholder "kill \$(cat /tmp/ard-keepalive.pid) 2>/dev/null; rm -f /tmp/ard-keepalive.pid" || true
           python3 scripts/record.py stop || true
           scp -o ControlPath=/tmp/mac_ssh \
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/phase-1/recording.mp4 2>/dev/null || echo "No recording"
 
-      - name: "[1/4] Reset desktop & restart ARD"
+      - name: "[1/4] Reset desktop"
         run: |
           ssh -S /tmp/mac_ssh placeholder "
             osascript -e 'quit app \"Safari\"' 2>/dev/null
             osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
-            sudo launchctl kickstart -k system/com.apple.screensharing
           " || true
-          sleep 5
 
       # ════════════════════════════════════════════════════════════
       # Phase 2: Install
@@ -128,6 +128,7 @@ jobs:
         run: |
           ssh -S /tmp/mac_ssh placeholder \
             "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
+          ssh -S /tmp/mac_ssh placeholder "nohup bash -c 'while true; do sudo launchctl kickstart -k system/com.apple.screensharing 2>/dev/null; sleep 30; done' >/dev/null 2>&1 & echo \$! > /tmp/ard-keepalive.pid"
           python3 scripts/record.py start
 
       - name: "[2/4] Run Install phase"
@@ -154,18 +155,17 @@ jobs:
 
       - name: "[2/4] Stop recording & download"
         run: |
+          ssh -S /tmp/mac_ssh placeholder "kill \$(cat /tmp/ard-keepalive.pid) 2>/dev/null; rm -f /tmp/ard-keepalive.pid" || true
           python3 scripts/record.py stop || true
           scp -o ControlPath=/tmp/mac_ssh \
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/phase-2/recording.mp4 2>/dev/null || echo "No recording"
 
-      - name: "[2/4] Reset desktop & restart ARD"
+      - name: "[2/4] Reset desktop"
         run: |
           ssh -S /tmp/mac_ssh placeholder "
             osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
-            sudo launchctl kickstart -k system/com.apple.screensharing
           " || true
-          sleep 5
 
       # ════════════════════════════════════════════════════════════
       # Phase 3: Launch
@@ -175,6 +175,7 @@ jobs:
         run: |
           ssh -S /tmp/mac_ssh placeholder \
             "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
+          ssh -S /tmp/mac_ssh placeholder "nohup bash -c 'while true; do sudo launchctl kickstart -k system/com.apple.screensharing 2>/dev/null; sleep 30; done' >/dev/null 2>&1 & echo \$! > /tmp/ard-keepalive.pid"
           python3 scripts/record.py start
 
       - name: "[3/4] Run Launch phase"
@@ -201,19 +202,18 @@ jobs:
 
       - name: "[3/4] Stop recording & download"
         run: |
+          ssh -S /tmp/mac_ssh placeholder "kill \$(cat /tmp/ard-keepalive.pid) 2>/dev/null; rm -f /tmp/ard-keepalive.pid" || true
           python3 scripts/record.py stop || true
           scp -o ControlPath=/tmp/mac_ssh \
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/phase-3/recording.mp4 2>/dev/null || echo "No recording"
 
-      - name: "[3/4] Reset desktop & restart ARD"
+      - name: "[3/4] Reset desktop"
         run: |
           ssh -S /tmp/mac_ssh placeholder "
             osascript -e 'quit app \"Phantom-WG\"' 2>/dev/null
             osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
-            sudo launchctl kickstart -k system/com.apple.screensharing
           " || true
-          sleep 5
 
       # ════════════════════════════════════════════════════════════
       # Phase 4: Verify
@@ -223,6 +223,7 @@ jobs:
         run: |
           ssh -S /tmp/mac_ssh placeholder \
             "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
+          ssh -S /tmp/mac_ssh placeholder "nohup bash -c 'while true; do sudo launchctl kickstart -k system/com.apple.screensharing 2>/dev/null; sleep 30; done' >/dev/null 2>&1 & echo \$! > /tmp/ard-keepalive.pid"
           python3 scripts/record.py start
 
       - name: "[4/4] Run Verify phase"
@@ -249,6 +250,7 @@ jobs:
 
       - name: "[4/4] Stop recording & download"
         run: |
+          ssh -S /tmp/mac_ssh placeholder "kill \$(cat /tmp/ard-keepalive.pid) 2>/dev/null; rm -f /tmp/ard-keepalive.pid" || true
           python3 scripts/record.py stop || true
           scp -o ControlPath=/tmp/mac_ssh \
             placeholder:/tmp/recording.mp4 \
