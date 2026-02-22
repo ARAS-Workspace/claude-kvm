@@ -3,7 +3,8 @@
 #
 # Manual trigger — pre-provisioned Scaleway Mac mini M1.
 # Test code lives on test/e2e/mac branch.
-# Experimental: 100-turn complex installation scenario.
+# 4-phase installation: Download → Install → Launch → Verify
+# Reboot between phases to avoid VNC/ARD connection drops (#8)
 
 name: Mac Phantom-WG Install Test
 
@@ -17,8 +18,8 @@ on:
         description: 'Observer model'
         default: 'qwen/qwen3-vl-235b-a22b-instruct'
       max_turns:
-        description: 'Max executor turns'
-        default: '100'
+        description: 'Max executor turns per phase'
+        default: '30'
 
 # ─────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ jobs:
 
     env:
       TZ: Europe/Istanbul
+      PROMPT_FILE: test/prompts/test_install_phantom_app.md
 
     steps:
       - name: Checkout test branch
@@ -36,47 +38,16 @@ jobs:
         with:
           ref: test/e2e/mac
 
-      # ── SSH Setup ──────────────────────────────────────────
+      # ── Common Setup ─────────────────────────────────────────
 
-      - name: Setup SSH
+      - name: Write SSH key
         env:
           MAC_SSH_PRIVATE_KEY: ${{ secrets.MAC_SSH_PRIVATE_KEY }}
-          MAC_HOST: ${{ secrets.MAC_HOST }}
-          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
         run: |
-          echo "::add-mask::$MAC_HOST"
-
+          echo "::add-mask::${{ secrets.MAC_HOST }}"
           mkdir -p ~/.ssh
           printf '%s\n' "$MAC_SSH_PRIVATE_KEY" > /tmp/mac_key
           chmod 600 /tmp/mac_key
-
-          ssh -fN \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o LogLevel=ERROR \
-            -o ControlPath=/tmp/mac_ssh \
-            -o ControlMaster=yes \
-            -o ControlPersist=yes \
-            -i /tmp/mac_key \
-            "${MAC_VNC_USERNAME}@${MAC_HOST}"
-
-          echo "SSH ready"
-
-      - name: Prevent display sleep
-        run: |
-          ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
-
-      # ── Screen Recording ───────────────────────────────────
-
-      - name: Cleanup remote recordings
-        run: |
-          ssh -S /tmp/mac_ssh placeholder \
-            "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
-
-      - name: Start screen recording
-        run: python3 scripts/record.py start
-
-      # ── Test Execution ─────────────────────────────────────
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -89,7 +60,31 @@ jobs:
       - name: Install daemon
         run: brew install ARAS-Workspace/tap/claude-kvm-daemon
 
-      - name: Run Phantom-WG install test
+      # ════════════════════════════════════════════════════════════
+      # Phase 1: Download
+      # ════════════════════════════════════════════════════════════
+
+      - name: "[1/4] SSH connect"
+        env:
+          MAC_HOST: ${{ secrets.MAC_HOST }}
+          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+        run: |
+          ssh -fN \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR -o ControlPath=/tmp/mac_ssh \
+            -o ControlMaster=yes -o ControlPersist=yes \
+            -i /tmp/mac_key "${MAC_VNC_USERNAME}@${MAC_HOST}"
+          ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
+
+      - name: "[1/4] Cleanup & start recording"
+        run: |
+          ssh -S /tmp/mac_ssh placeholder \
+            "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
+          python3 scripts/record.py start
+
+      - name: "[1/4] Run Download phase"
+        continue-on-error: true
+        id: phase1
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -99,25 +94,237 @@ jobs:
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
           CLAUDE_KVM_DAEMON_PARAMETERS: "-v"
-          SCREENSHOTS_DIR: ./test-screenshots
+          SCREENSHOTS_DIR: ./test-screenshots/phase-1
           EXECUTOR_MODEL: ${{ inputs.executor_model }}
           OBSERVER_MODEL: ${{ inputs.observer_model }}
           EXECUTOR_MAX_TURNS: ${{ inputs.max_turns }}
         run: |
           echo "::add-mask::$VNC_HOST"
-          mkdir -p test-screenshots
-          node test/test.js prompts/test_install_phantom_app.md
+          mkdir -p test-screenshots/phase-1
+          TASK=$(awk '/^# Download$/,/^# [A-Z]/' "$PROMPT_FILE" | sed '1d;$d')
+          export TASK
+          node test/integration.js
 
-      # ── Cleanup (always) ───────────────────────────────────
-
-      - name: Stop recording and download
-        if: always()
+      - name: "[1/4] Stop recording & download"
         run: |
           python3 scripts/record.py stop || true
           scp -o ControlPath=/tmp/mac_ssh \
             placeholder:/tmp/recording.mp4 \
-            ./test-screenshots/recording.mp4 2>/dev/null || \
-          echo "No recording file"
+            ./test-screenshots/phase-1/recording.mp4 2>/dev/null || echo "No recording"
+
+      - name: "[1/4] Reset & reboot"
+        run: |
+          ssh -S /tmp/mac_ssh placeholder "
+            osascript -e 'quit app \"Safari\"' 2>/dev/null
+            osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
+          " || true
+          ssh -S /tmp/mac_ssh -O exit placeholder 2>/dev/null || true
+          ssh -i /tmp/mac_key -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
+            "${{ secrets.MAC_VNC_USERNAME }}@${{ secrets.MAC_HOST }}" "sudo reboot" || true
+          echo "Waiting for Mac to come back..."
+          for i in $(seq 1 60); do
+            ssh -i /tmp/mac_key -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
+              "${{ secrets.MAC_VNC_USERNAME }}@${{ secrets.MAC_HOST }}" "echo ready" 2>/dev/null && break
+            sleep 5
+          done
+          sleep 15
+
+      # ════════════════════════════════════════════════════════════
+      # Phase 2: Install
+      # ════════════════════════════════════════════════════════════
+
+      - name: "[2/4] SSH connect"
+        env:
+          MAC_HOST: ${{ secrets.MAC_HOST }}
+          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+        run: |
+          ssh -fN \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR -o ControlPath=/tmp/mac_ssh \
+            -o ControlMaster=yes -o ControlPersist=yes \
+            -i /tmp/mac_key "${MAC_VNC_USERNAME}@${MAC_HOST}"
+          ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
+
+      - name: "[2/4] Cleanup & start recording"
+        run: |
+          ssh -S /tmp/mac_ssh placeholder \
+            "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
+          python3 scripts/record.py start
+
+      - name: "[2/4] Run Install phase"
+        continue-on-error: true
+        id: phase2
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          VNC_HOST: ${{ secrets.MAC_HOST }}
+          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+          VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+          VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
+          CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
+          CLAUDE_KVM_DAEMON_PARAMETERS: "-v"
+          SCREENSHOTS_DIR: ./test-screenshots/phase-2
+          EXECUTOR_MODEL: ${{ inputs.executor_model }}
+          OBSERVER_MODEL: ${{ inputs.observer_model }}
+          EXECUTOR_MAX_TURNS: ${{ inputs.max_turns }}
+        run: |
+          echo "::add-mask::$VNC_HOST"
+          mkdir -p test-screenshots/phase-2
+          TASK=$(awk '/^# Install$/,/^# [A-Z]/' "$PROMPT_FILE" | sed '1d;$d')
+          export TASK
+          node test/integration.js
+
+      - name: "[2/4] Stop recording & download"
+        run: |
+          python3 scripts/record.py stop || true
+          scp -o ControlPath=/tmp/mac_ssh \
+            placeholder:/tmp/recording.mp4 \
+            ./test-screenshots/phase-2/recording.mp4 2>/dev/null || echo "No recording"
+
+      - name: "[2/4] Reset & reboot"
+        run: |
+          ssh -S /tmp/mac_ssh placeholder "
+            osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
+          " || true
+          ssh -S /tmp/mac_ssh -O exit placeholder 2>/dev/null || true
+          ssh -i /tmp/mac_key -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
+            "${{ secrets.MAC_VNC_USERNAME }}@${{ secrets.MAC_HOST }}" "sudo reboot" || true
+          echo "Waiting for Mac to come back..."
+          for i in $(seq 1 60); do
+            ssh -i /tmp/mac_key -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
+              "${{ secrets.MAC_VNC_USERNAME }}@${{ secrets.MAC_HOST }}" "echo ready" 2>/dev/null && break
+            sleep 5
+          done
+          sleep 15
+
+      # ════════════════════════════════════════════════════════════
+      # Phase 3: Launch
+      # ════════════════════════════════════════════════════════════
+
+      - name: "[3/4] SSH connect"
+        env:
+          MAC_HOST: ${{ secrets.MAC_HOST }}
+          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+        run: |
+          ssh -fN \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR -o ControlPath=/tmp/mac_ssh \
+            -o ControlMaster=yes -o ControlPersist=yes \
+            -i /tmp/mac_key "${MAC_VNC_USERNAME}@${MAC_HOST}"
+          ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
+
+      - name: "[3/4] Cleanup & start recording"
+        run: |
+          ssh -S /tmp/mac_ssh placeholder \
+            "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
+          python3 scripts/record.py start
+
+      - name: "[3/4] Run Launch phase"
+        continue-on-error: true
+        id: phase3
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          VNC_HOST: ${{ secrets.MAC_HOST }}
+          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+          VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+          VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
+          CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
+          CLAUDE_KVM_DAEMON_PARAMETERS: "-v"
+          SCREENSHOTS_DIR: ./test-screenshots/phase-3
+          EXECUTOR_MODEL: ${{ inputs.executor_model }}
+          OBSERVER_MODEL: ${{ inputs.observer_model }}
+          EXECUTOR_MAX_TURNS: ${{ inputs.max_turns }}
+        run: |
+          echo "::add-mask::$VNC_HOST"
+          mkdir -p test-screenshots/phase-3
+          TASK=$(awk '/^# Launch$/,/^# [A-Z]/' "$PROMPT_FILE" | sed '1d;$d')
+          export TASK
+          node test/integration.js
+
+      - name: "[3/4] Stop recording & download"
+        run: |
+          python3 scripts/record.py stop || true
+          scp -o ControlPath=/tmp/mac_ssh \
+            placeholder:/tmp/recording.mp4 \
+            ./test-screenshots/phase-3/recording.mp4 2>/dev/null || echo "No recording"
+
+      - name: "[3/4] Reset & reboot"
+        run: |
+          ssh -S /tmp/mac_ssh placeholder "
+            osascript -e 'quit app \"Phantom-WG\"' 2>/dev/null
+            osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
+          " || true
+          ssh -S /tmp/mac_ssh -O exit placeholder 2>/dev/null || true
+          ssh -i /tmp/mac_key -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
+            "${{ secrets.MAC_VNC_USERNAME }}@${{ secrets.MAC_HOST }}" "sudo reboot" || true
+          echo "Waiting for Mac to come back..."
+          for i in $(seq 1 60); do
+            ssh -i /tmp/mac_key -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
+              "${{ secrets.MAC_VNC_USERNAME }}@${{ secrets.MAC_HOST }}" "echo ready" 2>/dev/null && break
+            sleep 5
+          done
+          sleep 15
+
+      # ════════════════════════════════════════════════════════════
+      # Phase 4: Verify
+      # ════════════════════════════════════════════════════════════
+
+      - name: "[4/4] SSH connect"
+        env:
+          MAC_HOST: ${{ secrets.MAC_HOST }}
+          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+        run: |
+          ssh -fN \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR -o ControlPath=/tmp/mac_ssh \
+            -o ControlMaster=yes -o ControlPersist=yes \
+            -i /tmp/mac_key "${MAC_VNC_USERNAME}@${MAC_HOST}"
+          ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
+
+      - name: "[4/4] Cleanup & start recording"
+        run: |
+          ssh -S /tmp/mac_ssh placeholder \
+            "kill \$(pgrep -f avfoundation) 2>/dev/null; rm -f /tmp/recording.mp4" || true
+          python3 scripts/record.py start
+
+      - name: "[4/4] Run Verify phase"
+        continue-on-error: true
+        id: phase4
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          VNC_HOST: ${{ secrets.MAC_HOST }}
+          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+          VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+          VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
+          CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
+          CLAUDE_KVM_DAEMON_PARAMETERS: "-v"
+          SCREENSHOTS_DIR: ./test-screenshots/phase-4
+          EXECUTOR_MODEL: ${{ inputs.executor_model }}
+          OBSERVER_MODEL: ${{ inputs.observer_model }}
+          EXECUTOR_MAX_TURNS: ${{ inputs.max_turns }}
+        run: |
+          echo "::add-mask::$VNC_HOST"
+          mkdir -p test-screenshots/phase-4
+          TASK=$(awk '/^# Verify$/,0' "$PROMPT_FILE" | sed '1d')
+          export TASK
+          node test/integration.js
+
+      - name: "[4/4] Stop recording & download"
+        run: |
+          python3 scripts/record.py stop || true
+          scp -o ControlPath=/tmp/mac_ssh \
+            placeholder:/tmp/recording.mp4 \
+            ./test-screenshots/phase-4/recording.mp4 2>/dev/null || echo "No recording"
+
+      # ── Final Cleanup ─────────────────────────────────────────
 
       - name: Reset remote desktop
         if: always()
@@ -126,7 +333,6 @@ jobs:
             osascript -e 'quit app \"Safari\"' 2>/dev/null
             osascript -e 'quit app \"Phantom-WG\"' 2>/dev/null
             osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
-            osascript -e 'tell app \"System Events\" to key code 36' 2>/dev/null
           " || true
 
       - name: Close SSH
