@@ -4,7 +4,7 @@
 # Manual trigger — pre-provisioned Scaleway Mac mini M1.
 # Test code lives on test/e2e/mac branch.
 # 4-phase installation: Download → Install → Launch → Verify
-# Reboot between phases to avoid VNC/ARD connection drops (#8)
+# SSH tunnel for VNC stability + caffeinate to prevent sleep (#8)
 
 name: Mac Phantom-WG Install Test
 
@@ -49,6 +49,21 @@ jobs:
           printf '%s\n' "$MAC_SSH_PRIVATE_KEY" > /tmp/mac_key
           chmod 600 /tmp/mac_key
 
+      - name: SSH connect + VNC tunnel
+        env:
+          MAC_HOST: ${{ secrets.MAC_HOST }}
+          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+          MAC_VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+        run: |
+          ssh -fN \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR -o ControlPath=/tmp/mac_ssh \
+            -o ControlMaster=yes -o ControlPersist=yes \
+            -L 5901:localhost:${MAC_VNC_PORT} \
+            -i /tmp/mac_key "${MAC_VNC_USERNAME}@${MAC_HOST}"
+          echo "SSH tunnel ready (localhost:5901 → remote:${MAC_VNC_PORT})"
+          ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -64,18 +79,6 @@ jobs:
       # Phase 1: Download
       # ════════════════════════════════════════════════════════════
 
-      - name: "[1/4] SSH connect"
-        env:
-          MAC_HOST: ${{ secrets.MAC_HOST }}
-          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
-        run: |
-          ssh -fN \
-            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -o LogLevel=ERROR -o ControlPath=/tmp/mac_ssh \
-            -o ControlMaster=yes -o ControlPersist=yes \
-            -i /tmp/mac_key "${MAC_VNC_USERNAME}@${MAC_HOST}"
-          ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
-
       - name: "[1/4] Cleanup & start recording"
         run: |
           ssh -S /tmp/mac_ssh placeholder \
@@ -88,8 +91,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: ${{ secrets.MAC_HOST }}
-          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+          VNC_HOST: localhost
+          VNC_PORT: '5901'
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
@@ -99,7 +102,6 @@ jobs:
           OBSERVER_MODEL: ${{ inputs.observer_model }}
           EXECUTOR_MAX_TURNS: ${{ inputs.max_turns }}
         run: |
-          echo "::add-mask::$VNC_HOST"
           mkdir -p test-screenshots/phase-1
           awk '/^# Download$/{f=1;next} /^# [A-Z]/{if(f)exit} f' "$PROMPT_FILE" > /tmp/phase-prompt.md
           cat /tmp/phase-prompt.md
@@ -112,40 +114,16 @@ jobs:
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/phase-1/recording.mp4 2>/dev/null || echo "No recording"
 
-      - name: "[1/4] Reset & reboot"
+      - name: "[1/4] Reset desktop"
         run: |
           ssh -S /tmp/mac_ssh placeholder "
             osascript -e 'quit app \"Safari\"' 2>/dev/null
             osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
           " || true
-          ssh -S /tmp/mac_ssh -O exit placeholder 2>/dev/null || true
-          ssh -i /tmp/mac_key -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
-            "${{ secrets.MAC_VNC_USERNAME }}@${{ secrets.MAC_HOST }}" "sudo reboot" || true
-          echo "Waiting for Mac to come back..."
-          for i in $(seq 1 60); do
-            ssh -i /tmp/mac_key -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
-              "${{ secrets.MAC_VNC_USERNAME }}@${{ secrets.MAC_HOST }}" "echo ready" 2>/dev/null && break
-            sleep 5
-          done
-          sleep 15
 
       # ════════════════════════════════════════════════════════════
       # Phase 2: Install
       # ════════════════════════════════════════════════════════════
-
-      - name: "[2/4] SSH connect"
-        env:
-          MAC_HOST: ${{ secrets.MAC_HOST }}
-          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
-        run: |
-          ssh -fN \
-            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -o LogLevel=ERROR -o ControlPath=/tmp/mac_ssh \
-            -o ControlMaster=yes -o ControlPersist=yes \
-            -i /tmp/mac_key "${MAC_VNC_USERNAME}@${MAC_HOST}"
-          ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
 
       - name: "[2/4] Cleanup & start recording"
         run: |
@@ -159,8 +137,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: ${{ secrets.MAC_HOST }}
-          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+          VNC_HOST: localhost
+          VNC_PORT: '5901'
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
@@ -170,7 +148,6 @@ jobs:
           OBSERVER_MODEL: ${{ inputs.observer_model }}
           EXECUTOR_MAX_TURNS: ${{ inputs.max_turns }}
         run: |
-          echo "::add-mask::$VNC_HOST"
           mkdir -p test-screenshots/phase-2
           awk '/^# Install$/{f=1;next} /^# [A-Z]/{if(f)exit} f' "$PROMPT_FILE" > /tmp/phase-prompt.md
           cat /tmp/phase-prompt.md
@@ -183,39 +160,15 @@ jobs:
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/phase-2/recording.mp4 2>/dev/null || echo "No recording"
 
-      - name: "[2/4] Reset & reboot"
+      - name: "[2/4] Reset desktop"
         run: |
           ssh -S /tmp/mac_ssh placeholder "
             osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
           " || true
-          ssh -S /tmp/mac_ssh -O exit placeholder 2>/dev/null || true
-          ssh -i /tmp/mac_key -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
-            "${{ secrets.MAC_VNC_USERNAME }}@${{ secrets.MAC_HOST }}" "sudo reboot" || true
-          echo "Waiting for Mac to come back..."
-          for i in $(seq 1 60); do
-            ssh -i /tmp/mac_key -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
-              "${{ secrets.MAC_VNC_USERNAME }}@${{ secrets.MAC_HOST }}" "echo ready" 2>/dev/null && break
-            sleep 5
-          done
-          sleep 15
 
       # ════════════════════════════════════════════════════════════
       # Phase 3: Launch
       # ════════════════════════════════════════════════════════════
-
-      - name: "[3/4] SSH connect"
-        env:
-          MAC_HOST: ${{ secrets.MAC_HOST }}
-          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
-        run: |
-          ssh -fN \
-            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -o LogLevel=ERROR -o ControlPath=/tmp/mac_ssh \
-            -o ControlMaster=yes -o ControlPersist=yes \
-            -i /tmp/mac_key "${MAC_VNC_USERNAME}@${MAC_HOST}"
-          ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
 
       - name: "[3/4] Cleanup & start recording"
         run: |
@@ -229,8 +182,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: ${{ secrets.MAC_HOST }}
-          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+          VNC_HOST: localhost
+          VNC_PORT: '5901'
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
@@ -240,7 +193,6 @@ jobs:
           OBSERVER_MODEL: ${{ inputs.observer_model }}
           EXECUTOR_MAX_TURNS: ${{ inputs.max_turns }}
         run: |
-          echo "::add-mask::$VNC_HOST"
           mkdir -p test-screenshots/phase-3
           awk '/^# Launch$/{f=1;next} /^# [A-Z]/{if(f)exit} f' "$PROMPT_FILE" > /tmp/phase-prompt.md
           cat /tmp/phase-prompt.md
@@ -253,40 +205,16 @@ jobs:
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/phase-3/recording.mp4 2>/dev/null || echo "No recording"
 
-      - name: "[3/4] Reset & reboot"
+      - name: "[3/4] Reset desktop"
         run: |
           ssh -S /tmp/mac_ssh placeholder "
             osascript -e 'quit app \"Phantom-WG\"' 2>/dev/null
             osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
           " || true
-          ssh -S /tmp/mac_ssh -O exit placeholder 2>/dev/null || true
-          ssh -i /tmp/mac_key -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
-            "${{ secrets.MAC_VNC_USERNAME }}@${{ secrets.MAC_HOST }}" "sudo reboot" || true
-          echo "Waiting for Mac to come back..."
-          for i in $(seq 1 60); do
-            ssh -i /tmp/mac_key -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
-              "${{ secrets.MAC_VNC_USERNAME }}@${{ secrets.MAC_HOST }}" "echo ready" 2>/dev/null && break
-            sleep 5
-          done
-          sleep 15
 
       # ════════════════════════════════════════════════════════════
       # Phase 4: Verify
       # ════════════════════════════════════════════════════════════
-
-      - name: "[4/4] SSH connect"
-        env:
-          MAC_HOST: ${{ secrets.MAC_HOST }}
-          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
-        run: |
-          ssh -fN \
-            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -o LogLevel=ERROR -o ControlPath=/tmp/mac_ssh \
-            -o ControlMaster=yes -o ControlPersist=yes \
-            -i /tmp/mac_key "${MAC_VNC_USERNAME}@${MAC_HOST}"
-          ssh -S /tmp/mac_ssh placeholder "nohup caffeinate -d -i -s >/dev/null 2>&1 &"
 
       - name: "[4/4] Cleanup & start recording"
         run: |
@@ -300,8 +228,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VNC_HOST: ${{ secrets.MAC_HOST }}
-          VNC_PORT: ${{ secrets.MAC_VNC_PORT }}
+          VNC_HOST: localhost
+          VNC_PORT: '5901'
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
@@ -311,7 +239,6 @@ jobs:
           OBSERVER_MODEL: ${{ inputs.observer_model }}
           EXECUTOR_MAX_TURNS: ${{ inputs.max_turns }}
         run: |
-          echo "::add-mask::$VNC_HOST"
           mkdir -p test-screenshots/phase-4
           awk '/^# Verify$/{f=1;next} f' "$PROMPT_FILE" > /tmp/phase-prompt.md
           cat /tmp/phase-prompt.md
