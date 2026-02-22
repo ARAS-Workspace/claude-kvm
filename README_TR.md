@@ -14,6 +14,8 @@ Claude KVM, VNC protokolü üzerinden uzak masaüstü ortamlarını kontrol eden
 - [Mac Scientific Calculator Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261184519)
 - [Mac Safari Browsing Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261430282)
 - [Mac Drag & Drop Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22277460796)
+- [Mac Chess Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22286270207)
+- [Mac Chess Direct Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22286704229)
 
 > [!NOTE]
 > Testler GitHub Actions üzerinde CI ortamında şeffaf biçimde yürütülmektedir — her adım aşama aşama görülebilir. Her testin sonunda, entegrasyon başarılı ya da başarısız olsun, ajanın oturum boyunca attığı her adımın ekran görüntüleri ve oturumun tamamını yansıtan `.mp4` video kaydı yer almaktadır. Bu kayıtları ve görüntüleri inceleyerek ajanın sistem komutundaki görevi hangi aşamalardan geçerek ne kadar sürede tamamladığını gözlemleyebilir, MCP sunucusunu kendi ortamınızda kullanırken buradaki örneklerden faydalanarak sistem komutunuzu veya talimatlarınızı şekillendirebilirsiniz.
