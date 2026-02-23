@@ -197,7 +197,7 @@ jobs:
           VNC_HOST: localhost
           VNC_PORT: '5901'
           VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
-          VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
+          VNC_PASSWORD: ${{ env.TEMP_PASS }}
           CLAUDE_KVM_DAEMON_PATH: claude-kvm-daemon
           CLAUDE_KVM_DAEMON_PARAMETERS: "-v"
           SCREENSHOTS_DIR: ./test-screenshots/phase-3
