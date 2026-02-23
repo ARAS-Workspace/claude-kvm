@@ -1,3 +1,7 @@
+## General Rules
+
+- **Scrolling:** The scroll action runs client-side and has minimal effect per tick. Prefer key_tap "pagedown" / "pageup" to navigate pages. If you must use scroll, repeat it 5–10 times in an action_queue to cover meaningful distance.
+
 # Download
 
 Search for Phantom-WG on Google, find the GitHub repository, and download the DMG installer from releases.
