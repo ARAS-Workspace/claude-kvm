@@ -56,10 +56,18 @@ jobs:
           VERSION=${{ steps.version.outputs.version }}
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/g" server.json
 
+      # ── README Formatter ───────────────────────────────────
+
+      - name: Format README for npm/MCP
+        run: node .github/scripts/readme-formatter/index.js README.md README.md
+
       # ── npm Publish (OIDC) ────────────────────────────────
 
       - name: Publish to npm
         run: npm publish --provenance --access public
+
+      - name: Restore original README
+        run: git checkout README.md
 
       # ── MCP Registry ───────────────────────────────────────
 
