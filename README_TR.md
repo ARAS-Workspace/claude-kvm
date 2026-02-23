@@ -348,4 +348,6 @@ macOS, ARD auth type 30 kimlik bilgisi isteği üzerinden otomatik algılanır. 
 > [!NOTE]
 > Bare-metal Mac üzerinde mi çalışıyorsunuz? VNC güvenliği, SSH tünelleme ve oturum kararlılığı için [Mac M1 Preparation Tricks](https://gist.github.com/remrearas/a3f300635b02f2587a134882a51f7114) gist'ine göz atın.
 
+---
+
 Copyright (c) 2026 Rıza Emre ARAS — MIT Lisansı

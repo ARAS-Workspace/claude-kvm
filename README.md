@@ -348,4 +348,6 @@ macOS is auto-detected via the ARD auth type 30 credential request. When detecte
 > [!NOTE]
 > Running on a bare-metal Mac? See the [Mac M1 Preparation Tricks](https://gist.github.com/remrearas/a3f300635b02f2587a134882a51f7114) for VNC hardening, SSH tunneling, and session stability tips.
 
+---
+
 Copyright (c) 2026 Riza Emre ARAS — MIT License
