@@ -345,4 +345,7 @@ macOS is auto-detected via the ARD auth type 30 credential request. When detecte
 
 [![MCP Badge](https://lobehub.com/badge/mcp/aras-workspace-claude-kvm?style=flat)](https://lobehub.com/mcp/aras-workspace-claude-kvm)
 
+> [!NOTE]
+> Running on a bare-metal Mac? See the [Mac M1 Preparation Tricks](https://gist.github.com/remrearas/a3f300635b02f2587a134882a51f7114) for VNC hardening, SSH tunneling, and session stability tips.
+
 Copyright (c) 2026 Riza Emre ARAS — MIT License
