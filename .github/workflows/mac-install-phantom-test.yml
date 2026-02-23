@@ -169,6 +169,12 @@ jobs:
       # Phase 3: Launch
       # ════════════════════════════════════════════════════════════
 
+      - name: "[3/4] Write temp password for system extension approval"
+        env:
+          MAC_VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
+        run: |
+          ssh -S /tmp/mac_ssh placeholder "echo '${MAC_VNC_PASSWORD}' > /tmp/.test_pass && chmod 600 /tmp/.test_pass"
+
       - name: "[3/4] Cleanup & start recording"
         run: |
           ssh -S /tmp/mac_ssh placeholder \
@@ -204,9 +210,10 @@ jobs:
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/phase-3/recording.mp4 2>/dev/null || echo "No recording"
 
-      - name: "[3/4] Reset desktop"
+      - name: "[3/4] Clean temp password & reset desktop"
         run: |
           ssh -S /tmp/mac_ssh placeholder "
+            rm -f /tmp/.test_pass
             osascript -e 'quit app \"Phantom-WG\"' 2>/dev/null
             osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
           " || true
@@ -256,6 +263,7 @@ jobs:
         if: always()
         run: |
           ssh -S /tmp/mac_ssh placeholder "
+            rm -f /tmp/.test_pass
             osascript -e 'quit app \"Safari\"' 2>/dev/null
             osascript -e 'quit app \"Phantom-WG\"' 2>/dev/null
             osascript -e 'tell app \"Finder\" to close every window' 2>/dev/null
