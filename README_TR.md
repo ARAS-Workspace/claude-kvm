@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/ARAS-Workspace/claude-kvm">
-    <img src="https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/press-kit/masters/claude-kvm-icon-master.svg" alt="Claude KVM" width="180"/>
+    <img src="https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/press-kit/masters/claude-kvm-icon-animated.svg" alt="Claude KVM" width="180"/>
   </a>
 </p>
 
