@@ -23,21 +23,26 @@ Rules:
 
 # Install
 
-The DMG file has already been downloaded to the Downloads folder. Mount it and install the app to Applications.
+The DMG file has already been downloaded to the Downloads folder. Mount it and drag the app to Applications.
 
 1. Open Finder — click the Finder icon in the Dock or use Cmd+N
 2. Navigate to Downloads in the sidebar
-3. Find "Phantom-WG-MacOS-1.0.0.dmg" and double-click it to mount
-4. Wait for the DMG to mount — a new window should appear
-5. Open a separate Finder window (Cmd+N) and navigate to Applications in the sidebar
-6. Drag the Phantom-WG app from the DMG window into the Applications folder
-7. If a confirmation or "app from the internet" warning appears, click "Open" or "Move" to proceed
-8. Verify the app is in Applications, then call task_complete()
+3. Use detect_elements to find "Phantom-WG-MacOS-1.0.0.dmg" and double-click it to mount
+4. Wait for the DMG to mount — use wait(2000) then detect_elements to confirm the DMG window appeared
+5. Open a separate Finder window (Cmd+N) and navigate to Applications (Cmd+Shift+A)
+6. Position the Finder window and the DMG window side by side so both are visible
+7. Use detect_elements to locate the Phantom-WG app icon in the DMG window — note its center coordinates
+8. Use detect_elements to locate the Applications folder area in the Finder window — note its center coordinates
+9. Drag the Phantom-WG app from the DMG window into the Applications folder: mouse_drag from source to destination
+10. If a replace or confirmation dialog appears, accept it
+11. Use detect_elements in the Applications Finder window to verify "Phantom" is listed — this confirms the drag succeeded
+12. Call task_complete()
 
 Rules:
-- Use detect_elements to find clickable targets
+- Use detect_elements before and after every drag action — this is how you verify success
+- Do NOT fall back to Terminal or command-line tools — always use drag
+- Do NOT use the Applications shortcut inside the DMG — open a real Finder window for Applications
 - Use action_queue to batch actions where possible
-- If dragging fails, try right-click > Copy on the app, then right-click > Paste in Applications
 - Handle any dialog that appears by choosing the option that continues the installation
 - Be patient with DMG mounting — use wait(2000) between checks
 - Scrolling: scroll runs client-side with minimal effect per tick. Prefer key_tap "pagedown" / "pageup". If you must use scroll, repeat it 5–10 times in an action_queue to cover meaningful distance
