@@ -1,7 +1,3 @@
-## General Rules
-
-- **Scrolling:** The scroll action runs client-side and has minimal effect per tick. Prefer key_tap "pagedown" / "pageup" to navigate pages. If you must use scroll, repeat it 5–10 times in an action_queue to cover meaningful distance.
-
 # Download
 
 Search for Phantom-WG on Google, find the GitHub repository, and download the DMG installer from releases.
@@ -23,6 +19,7 @@ Rules:
 - Use action_queue to batch actions where possible
 - Safari uses Cmd-based shortcuts, not Ctrl
 - Be patient with the download — use wait(2000) between status checks
+- Scrolling: scroll runs client-side with minimal effect per tick. Prefer key_tap "pagedown" / "pageup". If you must use scroll, repeat it 5–10 times in an action_queue to cover meaningful distance
 
 # Install
 
@@ -43,6 +40,7 @@ Rules:
 - If dragging fails, try right-click > Copy on the app, then right-click > Paste in Applications
 - Handle any dialog that appears by choosing the option that continues the installation
 - Be patient with DMG mounting — use wait(2000) between checks
+- Scrolling: scroll runs client-side with minimal effect per tick. Prefer key_tap "pagedown" / "pageup". If you must use scroll, repeat it 5–10 times in an action_queue to cover meaningful distance
 
 # Launch
 
@@ -61,6 +59,7 @@ Rules:
 - Do not give up on permission dialogs — always choose the option that proceeds
 - If the app closes after granting permissions, relaunch it
 - Focus on speed — get to the app window as fast as possible
+- Scrolling: scroll runs client-side with minimal effect per tick. Prefer key_tap "pagedown" / "pageup". If you must use scroll, repeat it 5–10 times in an action_queue to cover meaningful distance
 
 # Verify
 
@@ -75,3 +74,4 @@ Rules:
 - Use detect_elements to confirm the app window content
 - Follow the flow — if something unexpected appears, read it and adapt
 - This is the final verification step — just confirm the app is running
+- Scrolling: scroll runs client-side with minimal effect per tick. Prefer key_tap "pagedown" / "pageup". If you must use scroll, repeat it 5–10 times in an action_queue to cover meaningful distance
