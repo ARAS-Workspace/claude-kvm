@@ -169,11 +169,18 @@ jobs:
       # Phase 3: Launch
       # ════════════════════════════════════════════════════════════
 
-      - name: "[3/4] Write temp password for system extension approval"
+      - name: "[3/4] Set temp password for system extension approval"
         env:
+          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
           MAC_VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
         run: |
-          ssh -S /tmp/mac_ssh placeholder "echo '${MAC_VNC_PASSWORD}' > /tmp/.test_pass && chmod 600 /tmp/.test_pass"
+          TEMP_PASS="test-$(openssl rand -hex 6)"
+          echo "TEMP_PASS=$TEMP_PASS" >> $GITHUB_ENV
+          ssh -S /tmp/mac_ssh placeholder \
+            "dscl . -passwd /Users/${MAC_VNC_USERNAME} '${MAC_VNC_PASSWORD}' '${TEMP_PASS}'"
+          ssh -S /tmp/mac_ssh placeholder \
+            "echo '${TEMP_PASS}' > /tmp/.test_pass && chmod 600 /tmp/.test_pass"
+          echo "Temp password set and written to /tmp/.test_pass"
 
       - name: "[3/4] Cleanup & start recording"
         run: |
@@ -210,8 +217,13 @@ jobs:
             placeholder:/tmp/recording.mp4 \
             ./test-screenshots/phase-3/recording.mp4 2>/dev/null || echo "No recording"
 
-      - name: "[3/4] Clean temp password & reset desktop"
+      - name: "[3/4] Restore password & reset desktop"
+        env:
+          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+          MAC_VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
         run: |
+          ssh -S /tmp/mac_ssh placeholder \
+            "dscl . -passwd /Users/${MAC_VNC_USERNAME} '${TEMP_PASS}' '${MAC_VNC_PASSWORD}'" || true
           ssh -S /tmp/mac_ssh placeholder "
             rm -f /tmp/.test_pass
             osascript -e 'quit app \"Phantom-WG\"' 2>/dev/null
@@ -258,6 +270,17 @@ jobs:
             ./test-screenshots/phase-4/recording.mp4 2>/dev/null || echo "No recording"
 
       # ── Final Cleanup ─────────────────────────────────────────
+
+      - name: Restore password (safety net)
+        if: always()
+        env:
+          MAC_VNC_USERNAME: ${{ secrets.MAC_VNC_USERNAME }}
+          MAC_VNC_PASSWORD: ${{ secrets.MAC_VNC_PASSWORD }}
+        run: |
+          if [ -n "$TEMP_PASS" ]; then
+            ssh -S /tmp/mac_ssh placeholder \
+              "dscl . -passwd /Users/${MAC_VNC_USERNAME} '${TEMP_PASS}' '${MAC_VNC_PASSWORD}'" 2>/dev/null || true
+          fi
 
       - name: Reset remote desktop
         if: always()
