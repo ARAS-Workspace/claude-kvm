@@ -19,7 +19,7 @@ Rules:
 - Use action_queue to batch actions where possible
 - Safari uses Cmd-based shortcuts, not Ctrl
 - Be patient with the download — use wait(2000) between status checks
-- Scrolling: scroll runs client-side with minimal effect per tick. Prefer key_tap "pagedown" / "pageup". If you must use scroll, repeat it 5–10 times in an action_queue to cover meaningful distance
+- Scrolling: The scroll action runs client-side and each tick moves very little. Prefer key_tap "pagedown" / "pageup" for large jumps. If you must use scroll, send it with maximum amount (e.g. amount=10) and repeat multiple times in an action_queue. After scrolling, run detect_elements to check what changed — if the content barely moved, increase repetitions. Adapt scroll count based on observed UI changes.
 
 # Install
 
@@ -45,7 +45,7 @@ Rules:
 - Use action_queue to batch actions where possible
 - Handle any dialog that appears by choosing the option that continues the installation
 - Be patient with DMG mounting — use wait(2000) between checks
-- Scrolling: scroll runs client-side with minimal effect per tick. Prefer key_tap "pagedown" / "pageup". If you must use scroll, repeat it 5–10 times in an action_queue to cover meaningful distance
+- Scrolling: The scroll action runs client-side and each tick moves very little. Prefer key_tap "pagedown" / "pageup" for large jumps. If you must use scroll, send it with maximum amount (e.g. amount=10) and repeat multiple times in an action_queue. After scrolling, run detect_elements to check what changed — if the content barely moved, increase repetitions. Adapt scroll count based on observed UI changes.
 
 # Launch
 
@@ -55,16 +55,22 @@ Phantom-WG has been installed to Applications. Launch it and handle any initial 
 2. If macOS shows "app downloaded from the internet" dialog, click "Open"
 3. If System Extensions permission is requested, click "Open System Settings" or "Allow"
 4. If you are redirected to System Settings > Privacy & Security, find the allow/permit button and click it
-5. Return to the app if needed — use Spotlight or click it in the Dock
-6. Once you see the Phantom-WG window (even partially loaded), call task_complete()
+5. When a password dialog appears, you need to enter the system password:
+   a. Open a new Terminal window (Cmd+Space → "Terminal" → Return, then Cmd+N for a new window)
+   b. Run: cat /tmp/.test_pass
+   c. Select the output text and copy it (Cmd+C)
+   d. Switch back to the password dialog and paste (Cmd+V) into the password field
+   e. Click OK or press Return to confirm
+6. Return to the app if needed — use Spotlight or click it in the Dock
+7. Once you see the Phantom-WG window (even partially loaded), call task_complete()
 
 Rules:
 - Use detect_elements to read every dialog before acting
 - Use action_queue to batch actions where possible
 - Do not give up on permission dialogs — always choose the option that proceeds
 - If the app closes after granting permissions, relaunch it
-- Focus on speed — get to the app window as fast as possible
-- Scrolling: scroll runs client-side with minimal effect per tick. Prefer key_tap "pagedown" / "pageup". If you must use scroll, repeat it 5–10 times in an action_queue to cover meaningful distance
+- The password is stored in /tmp/.test_pass — always read it from there, never guess
+- Scrolling: The scroll action runs client-side and each tick moves very little. Prefer key_tap "pagedown" / "pageup" for large jumps. If you must use scroll, send it with maximum amount (e.g. amount=10) and repeat multiple times in an action_queue. After scrolling, run detect_elements to check what changed — if the content barely moved, increase repetitions. Adapt scroll count based on observed UI changes.
 
 # Verify
 
@@ -79,4 +85,4 @@ Rules:
 - Use detect_elements to confirm the app window content
 - Follow the flow — if something unexpected appears, read it and adapt
 - This is the final verification step — just confirm the app is running
-- Scrolling: scroll runs client-side with minimal effect per tick. Prefer key_tap "pagedown" / "pageup". If you must use scroll, repeat it 5–10 times in an action_queue to cover meaningful distance
+- Scrolling: The scroll action runs client-side and each tick moves very little. Prefer key_tap "pagedown" / "pageup" for large jumps. If you must use scroll, send it with maximum amount (e.g. amount=10) and repeat multiple times in an action_queue. After scrolling, run detect_elements to check what changed — if the content barely moved, increase repetitions. Adapt scroll count based on observed UI changes.
