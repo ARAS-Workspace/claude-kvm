@@ -359,4 +359,6 @@ macOS is auto-detected via the ARD auth type 30 credential request. When detecte
 
 ---
 
+*"Claude" is a trademark of Anthropic, PBC. This project is not affiliated with or endorsed by Anthropic.*
+
 Copyright (c) 2026 Riza Emre ARAS — MIT License

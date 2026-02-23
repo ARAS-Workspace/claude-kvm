@@ -359,4 +359,6 @@ macOS, ARD auth type 30 kimlik bilgisi isteği üzerinden otomatik algılanır. 
 
 ---
 
+*"Claude", Anthropic, PBC'nin tescilli markasıdır. Bu proje Anthropic ile bağlantılı değildir ve Anthropic tarafından onaylanmamıştır.*
+
 Copyright (c) 2026 Rıza Emre ARAS — MIT Lisansı
