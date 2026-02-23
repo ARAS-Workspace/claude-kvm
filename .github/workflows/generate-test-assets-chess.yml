@@ -2,8 +2,8 @@
 # Claude KVM — Test Asset Generator (Mac Chess)
 #
 # Extracts logs + screen recording from a Mac Chess CI test run,
-# generates asciinema cast, terminal GIF/MP4, screen MP4,
-# and a composite split-screen video. No speed-up applied.
+# generates asciinema cast, terminal MP4, screen MP4 (4x speed),
+# and a composite split-screen MP4.
 #
 # Manual trigger — scripts live on press-kit branch.
 
@@ -24,6 +24,7 @@ jobs:
       TZ: Europe/Istanbul
       RUN_ID: '22286704229'
       ARTIFACT_NAME: 'test-artifacts-chess-direct'
+      SPEED: '4'
 
     steps:
       - name: Checkout press-kit branch
@@ -55,11 +56,11 @@ jobs:
           unzip -o logs.zip -d logs/
           node scripts/parse-ci-logs.js logs/ >> $GITHUB_OUTPUT
 
-      # ── Generate Cast + GIF ─────────────────────────────
+      # ── Generate Cast + Terminal MP4 ────────────────────
 
       - name: Generate asciinema cast
         run: |
-          cat test-logs.txt | node scripts/logs-to-cast.js 1 > test.cast
+          cat test-logs.txt | node scripts/logs-to-cast.js "$SPEED" > test.cast
           echo "Cast lines: $(wc -l < test.cast)"
 
       - name: Build agg image
@@ -67,7 +68,7 @@ jobs:
           git clone --depth 1 https://github.com/asciinema/agg /tmp/agg
           docker build -t agg /tmp/agg
 
-      - name: Render terminal GIF
+      - name: Render terminal GIF (intermediate)
         run: |
           docker run --rm -v "$PWD:/data" agg \
             --font-size 14 --theme solarized-dark \
@@ -91,14 +92,16 @@ jobs:
             test-terminal.mp4
           ls -lh test-terminal.mp4
 
-      - name: Build screen MP4 (trimmed)
+      - name: Build screen MP4 (trimmed + speed)
         run: |
           OFFSET=${{ steps.sync.outputs.OFFSET }}
           DURATION=${{ steps.sync.outputs.DURATION }}
+          PTS=$(echo "scale=4; 1/${SPEED}" | bc)
 
-          echo "Offset: ${OFFSET}s  Duration: ${DURATION}s"
+          echo "Offset: ${OFFSET}s  Duration: ${DURATION}s  PTS: ${PTS}"
 
           ffmpeg -y -ss "$OFFSET" -t "$DURATION" -i artifacts/recording.mp4 \
+            -filter:v "setpts=${PTS}*PTS" \
             -an -c:v libx264 -crf 18 -preset slow \
             -pix_fmt yuv420p \
             test-screen.mp4
@@ -119,12 +122,8 @@ jobs:
             -shortest \
             "${NAME}.mp4"
 
-          ffmpeg -y -i "${NAME}.mp4" \
-            -vf "fps=10,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
-            "${NAME}.gif"
-
           echo "=== Output files ==="
-          ls -lh "${NAME}".* test-*.mp4 test-*.gif test.cast
+          ls -lh "${NAME}.mp4" test-*.mp4 test.cast
 
       # ── Upload ──────────────────────────────────────────
 
@@ -134,11 +133,9 @@ jobs:
           name: test-assets-mac-chess-${{ env.RUN_ID }}
           path: |
             test.cast
-            test-terminal.gif
             test-terminal.mp4
             test-screen.mp4
             test-mac-chess-run-${{ env.RUN_ID }}.mp4
-            test-mac-chess-run-${{ env.RUN_ID }}.gif
 
       # ── Push to press-kit ──────────────────────────────────
 
@@ -147,8 +144,8 @@ jobs:
           NAME="test-mac-chess-run-${RUN_ID}"
 
           mkdir -p assets/test/mac/chess
-          cp test.cast test-terminal.gif test-terminal.mp4 \
-             test-screen.mp4 "${NAME}.mp4" "${NAME}.gif" \
+          cp test.cast test-terminal.mp4 \
+             test-screen.mp4 "${NAME}.mp4" \
              assets/test/mac/chess/
 
           git config user.name "github-actions[bot]"
