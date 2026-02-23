@@ -18,6 +18,7 @@ Claude KVM is an MCP tool that controls remote desktop environments over VNC. It
 - [Mac Drag & Drop Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22277460796)
 - [Mac Chess Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22286270207)
 - [Mac Chess Direct Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22286704229)
+- [Mac Phantom-WG Install Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22315144741)
 
 > [!NOTE]
 > Tests are conducted transparently on GitHub Actions — each step is visible in the CI environment. At the end of every test, whether the integration passes or fails, you'll find screenshots of each step the agent took during the session, along with an `.mp4` video recording that captures the entire session. By reviewing these recordings and screenshots, you can observe how the agent progressed through each stage, how long the task took, and what decisions were made based on the system prompt. You can use these examples as a reference when crafting your own system prompts or instructions for the MCP server in your own environment.
