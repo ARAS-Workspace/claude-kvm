@@ -45,10 +45,12 @@ jobs:
       - name: Fix MP4 for Safari (faststart)
         run: |
           if [ -d artifacts ]; then
-            find artifacts -name '*.mp4' -type f | while read -r f; do
-              echo "  Fixing: $f"
-              ffmpeg -y -loglevel error -i "$f" -c copy -movflags +faststart "${f%.mp4}-fixed.mp4" && mv "${f%.mp4}-fixed.mp4" "$f"
-            done
+            find artifacts -name '*.mp4' -type f -exec sh -c '
+              for f; do
+                echo "  Fixing: $f"
+                ffmpeg -y -loglevel error -i "$f" -c copy -movflags +faststart "${f%.mp4}-fixed.mp4" && mv "${f%.mp4}-fixed.mp4" "$f"
+              done
+            ' _ {} +
           fi
 
       - name: Generate directory indexes
