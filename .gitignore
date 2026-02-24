@@ -18,7 +18,6 @@ artifacts/
 demo-*
 *.zip
 test-logs.txt
-package-lock.json
 
 # IDE - WebStorm & Development Tools
 .idea/
