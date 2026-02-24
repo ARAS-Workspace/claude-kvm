@@ -1,0 +1,55 @@
+name: Deploy www to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - press-kit
+    paths:
+      - 'www/**'
+      - 'artifacts/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout press-kit branch
+        uses: actions/checkout@v4
+        with:
+          ref: press-kit
+
+      - name: Extract test artifacts
+        run: |
+          if [ -d artifacts ]; then
+            echo "Extracting test artifacts..."
+            for run_dir in artifacts/*/; do
+              [ -d "$run_dir" ] || continue
+              echo "  Processing $(basename "$run_dir")..."
+              for zip in "$run_dir"*.zip; do
+                [ -f "$zip" ] || continue
+                unzip -qo "$zip" -d "$run_dir"
+                rm "$zip"
+                echo "    Extracted $(basename "$zip")"
+              done
+            done
+            echo "Done."
+          fi
+
+      - name: Generate directory indexes
+        run: |
+          if [ -d artifacts ]; then
+            python3 scripts/generate-directory-indexes.py artifacts
+            mv artifacts www/artifacts
+            echo "Artifacts merged into www/artifacts/"
+          fi
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy www --project-name=claude-kvm --branch=main
