@@ -1,0 +1,29 @@
+name: Deploy www to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - press-kit
+    paths:
+      - 'www/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout press-kit branch
+        uses: actions/checkout@v4
+        with:
+          ref: press-kit
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy www --project-name=claude-kvm
