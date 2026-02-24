@@ -42,13 +42,17 @@ jobs:
             done
           fi
 
-      - name: Fix MP4 for Safari (faststart)
+      - name: Re-encode MP4 for Safari/iOS
         run: |
           if [ -d artifacts ]; then
             find artifacts -name '*.mp4' -type f -exec sh -c '
               for f; do
-                echo "  Fixing: $f"
-                ffmpeg -y -loglevel error -i "$f" -c copy -movflags +faststart "${f%.mp4}-fixed.mp4" && mv "${f%.mp4}-fixed.mp4" "$f"
+                echo "  Encoding: $f"
+                ffmpeg -y -loglevel error -i "$f" \
+                  -c:v libx264 -profile:v main -level 4.0 -pix_fmt yuv420p -crf 23 \
+                  -c:a aac -b:a 128k \
+                  -movflags +faststart \
+                  "${f%.mp4}-enc.mp4" && mv "${f%.mp4}-enc.mp4" "$f"
               done
             ' _ {} +
           fi
