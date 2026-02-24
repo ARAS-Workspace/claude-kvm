@@ -1,0 +1,397 @@
+/* Inter - latin-ext */
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400 600;
+    font-display: swap;
+    src: url('../fonts/inter/inter-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Inter - latin */
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400 600;
+    font-display: swap;
+    src: url('../fonts/inter/inter-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* JetBrains Mono - latin-ext */
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 400 500;
+    font-display: swap;
+    src: url('../fonts/jetbrains-mono/jetbrains-mono-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* JetBrains Mono - latin */
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 400 500;
+    font-display: swap;
+    src: url('../fonts/jetbrains-mono/jetbrains-mono-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* --- Reset --- */
+
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* --- Variables --- */
+
+:root {
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
+    --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", "Consolas",
+    monospace;
+    --font-emoji: "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
+    --transition: 0.3s ease;
+    --accent: #d4845a;
+    --accent-light: #db916e;
+    --accent-dark: #b46844;
+}
+
+[data-theme="dark"] {
+    --bg: #0a0a0a;
+    --card: #111111;
+    --card-header: #1a1a1a;
+    --border: #222222;
+    --text: #e5e5e5;
+    --text-muted: #737373;
+    --code-bg: #0d0d0d;
+    --code-text: #c9d1d9;
+    --icon-glow: rgba(212, 132, 90, 0.12);
+    --icon-glow-outer: rgba(212, 132, 90, 0);
+    --icon-brightness: 1;
+    --icon-saturate: 1;
+}
+
+[data-theme="light"] {
+    --bg: #f5f5f5;
+    --card: #ffffff;
+    --card-header: #f0f0f0;
+    --border: #e0e0e0;
+    --text: #1a1a1a;
+    --text-muted: #666666;
+    --code-bg: #fafafa;
+    --code-text: #24292f;
+    --icon-glow: rgba(212, 132, 90, 0.08);
+    --icon-glow-outer: rgba(212, 132, 90, 0);
+    --icon-brightness: 1.06;
+    --icon-saturate: 0.92;
+}
+
+/* --- Layout --- */
+
+body {
+    font-family: var(--font-sans), sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    transition:
+            background var(--transition),
+            color var(--transition);
+}
+
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: clamp(24px, 6vw, 48px);
+    width: 100%;
+    max-width: 520px;
+    text-align: center;
+    transition:
+            background var(--transition),
+            border-color var(--transition);
+}
+
+/* --- Terminal Block --- */
+
+.code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: clamp(20px, 5vw, 32px);
+    transition:
+            background var(--transition),
+            border-color var(--transition);
+}
+
+.code-header {
+    background: var(--card-header);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    transition:
+            background var(--transition),
+            border-color var(--transition);
+}
+
+.dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.dot.red { background: #ff5f56; }
+.dot.yellow { background: #ffbd2e; }
+.dot.green { background: #27ca40; }
+
+.code-content {
+    padding: clamp(16px, 4vw, 24px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+            radial-gradient(ellipse at center, var(--icon-glow) 0%, var(--icon-glow-outer) 70%);
+    transition:
+            background var(--transition);
+}
+
+.code-content .icon-link {
+    display: block;
+    line-height: 0;
+}
+
+.code-content .icon-link img {
+    width: clamp(120px, 35vw, 180px);
+    height: auto;
+    filter: brightness(var(--icon-brightness)) saturate(var(--icon-saturate));
+    transition: filter var(--transition);
+}
+
+/* --- Terminal Info --- */
+
+.terminal-info {
+    padding: 12px clamp(16px, 4vw, 24px) clamp(16px, 4vw, 24px);
+    font-family: var(--font-mono), monospace;
+    font-size: clamp(10px, 2.5vw, 13px);
+    line-height: 1.8;
+    text-align: left;
+    border-top: 1px solid var(--border);
+}
+
+.terminal-info .line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.terminal-info .prompt {
+    color: #27ca40;
+    user-select: none;
+}
+
+.terminal-info .label {
+    color: var(--text-muted);
+}
+
+.terminal-info .value {
+    color: var(--accent);
+    font-weight: 500;
+}
+
+.terminal-info .value a {
+    color: inherit;
+    text-decoration: none;
+    transition: opacity var(--transition);
+}
+
+.terminal-info .value a:hover {
+    opacity: 0.7;
+}
+
+.terminal-cursor {
+    display: inline-block;
+    width: 7px;
+    height: 14px;
+    background-color: #27ca40;
+    animation: blink 1s step-end infinite;
+    vertical-align: middle;
+    margin-left: 2px;
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}
+
+/* --- Title & Slogan --- */
+
+.title {
+    font-family: var(--font-sans), sans-serif;
+    font-size: clamp(22px, 6vw, 30px);
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+    color: var(--text);
+    transition: color var(--transition);
+}
+
+.slogan {
+    margin-bottom: clamp(20px, 5vw, 32px);
+}
+
+.slogan-text {
+    font-family: var(--font-mono), monospace;
+    font-size: clamp(11px, 3vw, 13px);
+    font-weight: 400;
+    color: var(--accent);
+    letter-spacing: 1px;
+    transition: color var(--transition);
+}
+
+/* --- Links --- */
+
+.links {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+}
+
+.link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    text-decoration: none;
+    font-family: var(--font-sans), sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all var(--transition);
+}
+
+.link:hover {
+    background: var(--border);
+}
+
+.link svg {
+    width: 18px;
+    height: 18px;
+    opacity: 0.8;
+}
+
+/* --- Description --- */
+
+.description {
+    font-family: var(--font-sans), sans-serif;
+    font-size: clamp(12px, 3.2vw, 14px);
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 24px;
+    transition: color var(--transition);
+}
+
+/* --- Theme Toggle --- */
+
+.theme-toggle {
+    display: flex;
+    justify-content: center;
+}
+
+.theme-toggle button {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-family: var(--font-emoji), sans-serif;
+    font-size: 16px;
+    line-height: 1;
+    transition: all var(--transition);
+}
+
+.theme-toggle button:hover {
+    background: var(--border);
+}
+
+.theme-toggle .icon {
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.theme-toggle button:hover .icon {
+    transform: rotate(15deg);
+}
+
+[data-theme="dark"] .sun { display: none; }
+[data-theme="light"] .moon { display: none; }
+
+/* --- Legal --- */
+
+.legal-links {
+    margin-top: 16px;
+    font-family: var(--font-sans), sans-serif;
+    font-size: 12px;
+}
+
+.legal-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color var(--transition);
+}
+
+.legal-links a:hover {
+    color: var(--text);
+}
+
+.legal-sep {
+    color: var(--text-muted);
+    margin: 0 4px;
+}
+
+/* --- Disclaimer --- */
+
+.disclaimer {
+    margin-top: 16px;
+    font-family: var(--font-sans), sans-serif;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    transition: color var(--transition);
+}
+
+/* --- Source Badge --- */
+
+.source-badge {
+    margin-top: 20px;
+    font-family: var(--font-mono), monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    transition: color var(--transition);
+}
+
+.source-badge a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color var(--transition);
+}
+
+.source-badge a:hover {
+    color: var(--text);
+}
