@@ -47,7 +47,7 @@ jobs:
           if [ -d artifacts ]; then
             find artifacts -name '*.mp4' -type f | while read -r f; do
               echo "  Fixing: $f"
-              ffmpeg -y -loglevel error -i "$f" -c copy -movflags +faststart "${f}.tmp" && mv "${f}.tmp" "$f"
+              ffmpeg -y -loglevel error -i "$f" -c copy -movflags +faststart "${f%.mp4}-fixed.mp4" && mv "${f%.mp4}-fixed.mp4" "$f"
             done
           fi
 
