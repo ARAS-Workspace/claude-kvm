@@ -7,7 +7,6 @@ on:
     paths:
       - 'www/**'
       - 'artifacts/**'
-  workflow_dispatch:
 
 permissions:
   contents: read
