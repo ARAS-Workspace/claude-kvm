@@ -15,8 +15,8 @@ permissions:
   deployments: write
 
 jobs:
-  deploy:
-    runs-on: self-hosted
+  build:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout press-kit branch
         uses: actions/checkout@v4
@@ -61,6 +61,23 @@ jobs:
             mv artifacts www/artifacts
             echo "Artifacts merged into www/artifacts/"
           fi
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: www-dist
+          path: www/
+          retention-days: 1
+
+  deploy:
+    runs-on: self-hosted
+    needs: build
+    steps:
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: www-dist
+          path: www/
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
