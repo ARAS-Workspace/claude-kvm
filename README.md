@@ -8,6 +8,10 @@
 
 <p align="center"><em>Remote Access, Artificial Intelligence</em></p>
 
+<p align="center">
+  <a href="https://www.claude-kvm.ai">claude-kvm.ai</a>
+</p>
+
 Claude KVM is an MCP tool that controls remote desktop environments over VNC. It consists of a thin JS proxy layer (MCP server) and a platform-native Swift VNC daemon running on your macOS system.
 
 [![Claude KVM Demo](https://github.com/ARAS-Workspace/claude-kvm/raw/press-kit/assets/test/linux/demo-run-22261661594.gif)](https://github.com/ARAS-Workspace/claude-kvm/blob/main/test/README.md)
