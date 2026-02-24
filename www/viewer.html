@@ -175,7 +175,7 @@
             const ext = filename.split('.').pop().toLowerCase();
             const mime = ext === 'mov' ? 'video/mp4' : `video/${ext}`;
             viewer.innerHTML = `
-                <video controls autoplay playsinline preload="metadata">
+                <video controls autoplay playsinline webkit-playsinline preload="metadata">
                     <source src="${raw}" type="${mime}">
                 </video>
                 <div class="meta">${filename}</div>
