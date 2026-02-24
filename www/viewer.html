@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude KVM — Viewer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: "SF Mono", "Fira Code", Consolas, monospace;
+            background: #0a0a0a;
+            color: #e5e5e5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Top bar --- */
+        .bar {
+            background: #0d0d0d;
+            border-bottom: 1px solid #222;
+            padding: 12px clamp(12px, 3vw, 20px);
+            font-size: clamp(11px, 2.5vw, 13px);
+            color: #737373;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            min-height: 44px;
+        }
+
+        .bar a { color: #d4845a; text-decoration: none; }
+        .bar a:hover { opacity: .7; }
+        .bar .sep { color: #333; margin: 0 1px; }
+        .bar .current { color: #e5e5e5; word-break: break-all; }
+
+        /* --- Main viewport --- */
+        main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: clamp(8px, 2vw, 16px);
+            overflow: hidden;
+        }
+
+        .viewer {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* --- Video --- */
+        video {
+            width: 100%;
+            max-height: 80vh;
+            border-radius: 8px;
+            background: #000;
+            outline: none;
+        }
+
+        /* --- Image --- */
+        .img-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-height: 50vh;
+        }
+
+        .img-wrap img {
+            max-width: 100%;
+            max-height: 85vh;
+            border-radius: 4px;
+            cursor: zoom-in;
+            transition: transform .25s ease;
+            transform-origin: center;
+        }
+
+        .img-wrap img.zoomed {
+            cursor: zoom-out;
+            transform: scale(2);
+        }
+
+        /* --- Footer controls --- */
+        .meta {
+            margin-top: 12px;
+            text-align: center;
+            font-size: clamp(11px, 2.5vw, 12px);
+            color: #737373;
+        }
+
+        .nav {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        .nav a {
+            color: #d4845a;
+            text-decoration: none;
+            font-size: 13px;
+            padding: 6px 16px;
+            border: 1px solid #222;
+            border-radius: 6px;
+            transition: background .2s;
+        }
+
+        .nav a:hover { background: #1a1a1a; }
+
+        /* --- Error state --- */
+        .error {
+            text-align: center;
+            padding: 40px 20px;
+            color: #737373;
+        }
+
+        .error code {
+            display: block;
+            margin-top: 8px;
+            color: #d4845a;
+            word-break: break-all;
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 480px) {
+            .nav a { padding: 8px 12px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="bar" id="breadcrumb"></div>
+
+<main>
+    <div class="viewer" id="viewer"></div>
+</main>
+
+<script>
+    const params = new URLSearchParams(location.search);
+    const file = params.get('file');
+    const type = params.get('type');
+    const viewer = document.getElementById('viewer');
+    const bar = document.getElementById('breadcrumb');
+
+    if (!file || !type) {
+        viewer.innerHTML = '<div class="error">Missing parameters.<code>?file=/path&type=image|video</code></div>';
+    } else {
+        const filename = file.split('/').pop();
+        const dir = file.substring(0, file.lastIndexOf('/') + 1);
+
+        document.title = `${filename} — Claude KVM`;
+
+        // Breadcrumb
+        const parts = file.split('/').filter(Boolean);
+        let acc = '/';
+        bar.innerHTML = '<a href="/">Claude KVM</a>' +
+            parts.map((p, i) => {
+                acc += p + '/';
+                if (i === parts.length - 1) {
+                    return `<span class="sep">/</span><span class="current">${p}</span>`;
+                }
+                const href = i === parts.length - 2 ? dir + 'index.html' : acc;
+                return `<span class="sep">/</span><a href="${href}">${p}</a>`;
+            }).join('');
+
+        const raw = file + '?raw';
+
+        if (type === 'video') {
+            const ext = filename.split('.').pop().toLowerCase();
+            const mime = ext === 'mov' ? 'video/mp4' : `video/${ext}`;
+            viewer.innerHTML = `
+                <video controls autoplay playsinline preload="metadata">
+                    <source src="${raw}" type="${mime}">
+                </video>
+                <div class="meta">${filename}</div>
+                <div class="nav">
+                    <a href="${raw}" download="${filename}">Download</a>
+                    <a href="${dir}index.html">&larr; Back</a>
+                </div>`;
+        } else if (type === 'image') {
+            viewer.innerHTML = `
+                <div class="img-wrap">
+                    <img src="${raw}" alt="${filename}" id="img">
+                </div>
+                <div class="meta">${filename}</div>
+                <div class="nav">
+                    <a href="${raw}" download="${filename}">Download</a>
+                    <a href="${dir}index.html">&larr; Back</a>
+                </div>`;
+
+            document.getElementById('img').addEventListener('click', function () {
+                this.classList.toggle('zoomed');
+            });
+        }
+    }
+</script>
+</body>
+</html>

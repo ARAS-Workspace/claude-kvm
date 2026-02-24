@@ -103,138 +103,103 @@ def create_index_html(directory_path, root_path=None):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claude KVM — Test Artifacts — {html.escape(title_text)}</title>
+    <title>Claude KVM &mdash; Test Artifacts &mdash; {html.escape(title_text)}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
 
         body {{
-            font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+            font-family: "SF Mono", "Fira Code", Consolas, monospace;
             background: #0a0a0a;
             min-height: 100vh;
             color: #e5e5e5;
-            padding: 20px;
         }}
 
-        .container {{
-            max-width: 960px;
-            margin: 0 auto;
-            background: #111111;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid #222222;
-        }}
-
-        .header {{
+        .bar {{
             background: #0d0d0d;
-            padding: 24px 30px;
-            border-bottom: 1px solid #222222;
-        }}
-
-        h1 {{
-            font-size: 20px;
-            font-weight: 600;
-            color: #d4845a;
-            margin-bottom: 10px;
-        }}
-
-        .breadcrumb {{
-            font-size: 13px;
+            border-bottom: 1px solid #222;
+            padding: 12px clamp(12px, 3vw, 20px);
+            font-size: clamp(11px, 2.5vw, 13px);
             color: #737373;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            min-height: 44px;
         }}
 
-        .breadcrumb a {{
-            color: #d4845a;
-            text-decoration: none;
-        }}
-
-        .breadcrumb a:hover {{
-            opacity: 0.7;
-        }}
-
-        .breadcrumb .sep {{
-            margin: 0 6px;
-            color: #333;
-        }}
+        .bar a {{ color: #d4845a; text-decoration: none; }}
+        .bar a:hover {{ opacity: .7; }}
+        .bar .sep {{ color: #333; margin: 0 1px; }}
 
         .content {{
-            padding: 20px 30px 30px;
+            max-width: 960px;
+            margin: 0 auto;
+            padding: clamp(12px, 3vw, 24px);
         }}
 
         .stats {{
-            background: #0d0d0d;
+            background: #111;
             border-radius: 8px;
-            padding: 12px 16px;
-            margin-bottom: 16px;
-            border: 1px solid #222222;
-            font-size: 13px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            border: 1px solid #222;
+            font-size: clamp(11px, 2.5vw, 13px);
             color: #737373;
         }}
 
-        .table-wrapper {{
-            overflow-x: auto;
+        /* --- Table (desktop) --- */
+        .listing {{
+            border: 1px solid #222;
             border-radius: 8px;
-        }}
-
-        .table-wrapper::-webkit-scrollbar {{
-            height: 6px;
-        }}
-
-        .table-wrapper::-webkit-scrollbar-thumb {{
-            background: #333;
-            border-radius: 3px;
+            overflow: hidden;
         }}
 
         table {{
             width: 100%;
-            min-width: 480px;
             border-collapse: collapse;
         }}
 
         thead {{
-            border-bottom: 1px solid #222222;
+            border-bottom: 1px solid #222;
         }}
 
         th {{
             text-align: left;
-            padding: 10px 12px;
+            padding: 10px 14px;
             font-weight: 500;
             color: #d4845a;
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 1px;
+            background: #0d0d0d;
         }}
 
         td {{
-            padding: 8px 12px;
+            padding: 8px 14px;
             border-bottom: 1px solid #1a1a1a;
             font-size: 13px;
         }}
 
-        tr:hover {{
+        tr:last-child td {{
+            border-bottom: none;
+        }}
+
+        tr:hover td {{
             background: rgba(212, 132, 90, 0.04);
         }}
 
         .icon {{
             display: inline-block;
-            width: 20px;
+            width: 18px;
             margin-right: 6px;
             text-align: center;
             font-style: normal;
         }}
 
-        a {{
-            color: #e5e5e5;
-            text-decoration: none;
-        }}
+        a {{ color: #e5e5e5; text-decoration: none; }}
+        a:hover {{ color: #d4845a; }}
 
-        a:hover {{
-            color: #d4845a;
-        }}
-
-        .size, .date {{
-            color: #737373;
-            font-size: 12px;
-        }}
+        .size, .date {{ color: #737373; font-size: 12px; white-space: nowrap; }}
 
         .empty {{
             text-align: center;
@@ -243,49 +208,77 @@ def create_index_html(directory_path, root_path=None):
         }}
 
         .footer {{
-            background: #0d0d0d;
-            padding: 16px 30px;
-            border-top: 1px solid #222222;
+            max-width: 960px;
+            margin: 24px auto 0;
+            padding: 0 clamp(12px, 3vw, 24px) 24px;
             text-align: center;
             font-size: 12px;
             color: #737373;
         }}
 
-        .footer a {{
-            color: #d4845a;
-        }}
+        .footer a {{ color: #d4845a; text-decoration: none; }}
 
-        @media (max-width: 640px) {{
-            body {{ padding: 0; }}
-            .container {{ border-radius: 0; border-left: 0; border-right: 0; }}
-            .header, .content {{ padding: 16px; }}
-            h1 {{ font-size: 17px; }}
-            .size-col {{ display: none; }}
+        /* --- Mobile: hide table, show cards --- */
+        .cards {{ display: none; }}
+
+        @media (max-width: 600px) {{
+            table {{ display: none; }}
+            .cards {{ display: block; }}
+
+            .card {{
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 10px 14px;
+                border-bottom: 1px solid #1a1a1a;
+                font-size: 13px;
+            }}
+
+            .card:last-child {{ border-bottom: none; }}
+            .card:active {{ background: rgba(212, 132, 90, 0.04); }}
+
+            .card .icon {{ flex-shrink: 0; font-size: 16px; }}
+
+            .card-info {{
+                flex: 1;
+                min-width: 0;
+            }}
+
+            .card-name {{
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }}
+
+            .card-name a {{ color: #e5e5e5; }}
+            .card-name a:hover {{ color: #d4845a; }}
+
+            .card-meta {{
+                font-size: 11px;
+                color: #737373;
+                margin-top: 2px;
+            }}
         }}
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Claude KVM &mdash; Test Artifacts</h1>
-            <div class="breadcrumb">
-                {'<span class="sep">/</span>'.join(f'<a href="{path}">{html.escape(name)}</a>' for name, path in breadcrumb_parts)}
-            </div>
+    <div class="bar">
+        <a href="/">Claude KVM</a>
+        {''.join(f'<span class="sep">/</span><a href="{path}">{html.escape(name)}</a>' for name, path in breadcrumb_parts)}
+    </div>
+
+    <div class="content">
+        <div class="stats">
+            {sum(1 for i in items if i['is_dir'])} directories,
+            {sum(1 for i in items if not i['is_dir'])} files
         </div>
 
-        <div class="content">
-            <div class="stats">
-                {sum(1 for i in items if i['is_dir'])} directories,
-                {sum(1 for i in items if not i['is_dir'])} files
-            </div>
+        {generate_listing(items) if items else '<div class="empty">No files or directories found</div>'}
+    </div>
 
-            {generate_table(items) if items else '<div class="empty">No files or directories found</div>'}
-        </div>
-
-        <div class="footer">
-            <a href="https://www.claude-kvm.ai">claude-kvm.ai</a>
-            &mdash; &copy; 2026 R&#305;za Emre ARAS
-        </div>
+    <div class="footer">
+        <a href="https://www.claude-kvm.ai">claude-kvm.ai</a>
+        &mdash; &copy; 2026 R&#305;za Emre ARAS
     </div>
 </body>
 </html>"""
@@ -293,46 +286,51 @@ def create_index_html(directory_path, root_path=None):
     return html_content
 
 
-def generate_table(items):
-    """Generate the file listing table"""
-    rows = []
+def generate_listing(items):
+    """Generate table + mobile cards for file listing"""
     sorted_items = sorted(items, key=lambda x: (not x['is_dir'], x['name'].lower()))
+
+    table_rows = []
+    card_rows = []
 
     for item in sorted_items:
         icon = get_icon(item)
+        name = html.escape(item['name'])
+        link = f"{item['name']}/index.html" if item['is_dir'] else item['name']
+        label = f"{name}/" if item['is_dir'] else name
+        size = format_size(item['size']) if item['size'] else '&mdash;'
+        date = item['modified'].strftime('%Y-%m-%d %H:%M')
 
-        if item['is_dir']:
-            link = f"{item['name']}/index.html"
-            name_display = f'<a href="{link}">{html.escape(item["name"])}/</a>'
-        else:
-            link = item['name']
-            name_display = f'<a href="{link}">{html.escape(item["name"])}</a>'
+        table_rows.append(
+            f'<tr>'
+            f'<td><span class="icon">{icon}</span><a href="{link}">{label}</a></td>'
+            f'<td class="size">{size}</td>'
+            f'<td class="date">{date}</td>'
+            f'</tr>'
+        )
 
-        size_display = f'<td class="size size-col">{format_size(item["size"])}</td>' if item[
-            'size'] else '<td class="size size-col">&mdash;</td>'
-        date_display = f'<td class="date">{item["modified"].strftime("%Y-%m-%d %H:%M")}</td>'
+        card_rows.append(
+            f'<div class="card">'
+            f'<span class="icon">{icon}</span>'
+            f'<div class="card-info">'
+            f'<div class="card-name"><a href="{link}">{label}</a></div>'
+            f'<div class="card-meta">{size} &middot; {date}</div>'
+            f'</div>'
+            f'</div>'
+        )
 
-        rows.append(f"""
-            <tr>
-                <td><span class="icon">{icon}</span>{name_display}</td>
-                {size_display}
-                {date_display}
-            </tr>""")
+    table = (
+        f'<div class="listing">'
+        f'<table><thead><tr>'
+        f'<th>Name</th><th>Size</th><th>Modified</th>'
+        f'</tr></thead><tbody>'
+        f"{''.join(table_rows)}"
+        f'</tbody></table>'
+        f'<div class="cards">{"".join(card_rows)}</div>'
+        f'</div>'
+    )
 
-    return f"""
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th class="size-col">Size</th>
-                        <th>Modified</th>
-                    </tr>
-                </thead>
-                <tbody>{''.join(rows)}
-                </tbody>
-            </table>
-        </div>"""
+    return table
 
 
 def process_directory_tree(root_dir):
