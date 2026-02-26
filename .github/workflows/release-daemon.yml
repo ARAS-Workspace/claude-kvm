@@ -4,13 +4,13 @@ on:
   push:
     tags: ['daemon-v*']
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   extract-version:
     name: Extract Version
     runs-on: ubuntu-latest
+    permissions: {}
     outputs:
       version: ${{ steps.version.outputs.version }}
       dmg_name: ${{ steps.version.outputs.dmg_name }}
@@ -33,23 +33,29 @@ jobs:
     uses: ./.github/workflows/build-daemon.yml
     with:
       version: ${{ needs.extract-version.outputs.version }}
-    secrets: inherit
+    secrets:
+      DEVELOPER_ID_CERTIFICATE_P12: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 }}
+      DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
 
   create-release:
     name: Create GitHub Release
     needs: [extract-version, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     if: success()
 
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: ${{ runner.temp }}/release
           merge-multiple: true
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           tag_name: "daemon-v${{ needs.extract-version.outputs.version }}"
           name: "claude-kvm-daemon ${{ needs.extract-version.outputs.version }}"
