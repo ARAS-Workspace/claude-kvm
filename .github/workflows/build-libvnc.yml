@@ -54,13 +54,13 @@ jobs:
           path: artifact/
           retention-days: 90
 
-      - name: Commit prebuilt to daemon-tool-dev
+      - name: Commit prebuilt to daemon-tool
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git fetch origin daemon-tool-dev
-          git checkout daemon-tool-dev
+          git fetch origin daemon-tool
+          git checkout daemon-tool
 
           mkdir -p vendor/libvnc/prebuilt/include/rfb
           cp artifact/libvncclient.a vendor/libvnc/prebuilt/
@@ -80,4 +80,4 @@ jobs:
           Source: LibVNCServer-${LIBVNC_VERSION}
           TLS: OpenSSL 3.x
           Compression: zlib"
-          git push origin daemon-tool-dev
+          git push origin daemon-tool
