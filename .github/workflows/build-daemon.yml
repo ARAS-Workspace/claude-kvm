@@ -16,7 +16,6 @@ on:
         required: true
       APPLE_ID_PASSWORD:
         required: true
-  workflow_dispatch:
 
 concurrency:
   group: build-daemon-${{ github.ref }}
