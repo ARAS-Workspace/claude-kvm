@@ -30,10 +30,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
@@ -45,15 +47,18 @@ jobs:
 
       - name: Bump version
         id: version
+        env:
+          BUMP: ${{ inputs.bump }}
         run: |
-          npm version ${{ inputs.bump }} --no-git-tag-version
+          npm version "$BUMP" --no-git-tag-version
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Bumped to $VERSION"
 
       - name: Update server.json version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION=${{ steps.version.outputs.version }}
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/g" server.json
 
       # ── README Formatter ───────────────────────────────────
@@ -84,8 +89,11 @@ jobs:
       # ── Commit & Push ──────────────────────────────────────
 
       - name: Commit and push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION=${{ steps.version.outputs.version }}
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json server.json

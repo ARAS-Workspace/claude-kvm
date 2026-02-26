@@ -28,12 +28,13 @@ jobs:
 
     steps:
       - name: Checkout press-kit branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: press-kit
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
 
@@ -128,7 +129,7 @@ jobs:
       # ── Upload ──────────────────────────────────────────
 
       - name: Upload test assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-assets-mac-chess-${{ env.RUN_ID }}
           path: |
@@ -140,6 +141,8 @@ jobs:
       # ── Push to press-kit ──────────────────────────────────
 
       - name: Push assets to press-kit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           NAME="test-mac-chess-run-${RUN_ID}"
 
@@ -148,6 +151,7 @@ jobs:
              test-screen.mp4 "${NAME}.mp4" \
              assets/test/mac/chess/
 
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f assets/test/mac/chess/

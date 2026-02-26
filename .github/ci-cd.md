@@ -34,11 +34,3 @@
 | Workflow            | Trigger                        | Runner        | Output                 |
 |---------------------|--------------------------------|---------------|------------------------|
 | `auto-close-pr.yml` | `pull_request_target` (opened) | ubuntu-latest | Close unauthorized PRs |
-
-## Notes
-
-- **Integration tests** use Claude as executor and Qwen-VL as observer
-- `integration-test.yml` creates a DigitalOcean droplet (Xvfb + XFCE + x11vnc), others run native macOS
-- **persist-artifacts** downloads artifacts from a test run, zips them, and commits to `press-kit` branch under `artifacts/{run_id}/`
-- **deploy-www.yml** lives on `press-kit` branch: extracts zips, re-encodes MP4 for Safari/iOS, generates directory indexes, deploys to Cloudflare Pages
-- All test workflows upload screenshots + screen recording as artifacts
