@@ -8,13 +8,13 @@
     "url": "https://github.com/ARAS-Workspace/claude-kvm",
     "source": "github"
   },
-  "version": "2.0.10",
+  "version": "2.0.11",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "claude-kvm",
-      "version": "2.0.10",
+      "version": "2.0.11",
       "transport": {
         "type": "stdio"
       },
