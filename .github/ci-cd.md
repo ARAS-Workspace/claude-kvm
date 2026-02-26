@@ -24,15 +24,15 @@
 
 ## Publish & Deploy
 
-| Workflow | Trigger | Runner | Output |
-|---|---|---|---|
-| `publish.yml` | manual (patch/minor/major) | ubuntu-latest | npm publish (OIDC) + git tag |
-| `persist-artifacts.yml` | manual (run_id) | ubuntu-latest | Zip artifacts → press-kit branch |
+| Workflow                | Trigger                    | Runner        | Output                           |
+|-------------------------|----------------------------|---------------|----------------------------------|
+| `publish.yml`           | manual (patch/minor/major) | ubuntu-latest | npm publish (OIDC) + git tag     |
+| `persist-artifacts.yml` | manual (run_id)            | ubuntu-latest | Zip artifacts → press-kit branch |
 
 ## Repository Management
 
-| Workflow | Trigger | Runner | Output |
-|---|---|---|---|
+| Workflow            | Trigger                        | Runner        | Output                 |
+|---------------------|--------------------------------|---------------|------------------------|
 | `auto-close-pr.yml` | `pull_request_target` (opened) | ubuntu-latest | Close unauthorized PRs |
 
 ## Notes
