@@ -25,6 +25,8 @@ final class VNCBridge: @unchecked Sendable {
     private let isRunning = OSAllocatedUnfairLock(initialState: false)
     private var messageLoopTask: Task<Void, Never>?
     private let messageQueue = DispatchQueue(label: "vnc.message-loop", qos: .userInteractive)
+    /// Only touched on messageQueue (message loop).
+    private var lastUpdateRequestNs: UInt64 = 0
     private var reconnectCount = 0
     private var stateStreamContinuation: AsyncStream<VNCConnectionState>.Continuation?
 
@@ -293,7 +295,17 @@ final class VNCBridge: @unchecked Sendable {
                             }
                         }
 
-                        _ = SendIncrementalFramebufferUpdateRequest(client)
+                        // Pace incremental update requests to ~20/s. One per
+                        // iteration floods the server (~440/s measured) and
+                        // amplifies its response stream beyond what we drain;
+                        // screenshots read the local framebuffer, so ≤50ms
+                        // staleness is invisible to callers.
+                        let now = DispatchTime.now().uptimeNanoseconds
+                        if now &- self.lastUpdateRequestNs > 50_000_000 {
+                            _ = SendIncrementalFramebufferUpdateRequest(client)
+                            self.lastUpdateRequestNs = now
+                        }
+
                         continuation.resume(returning: true)
                     }
                 }
