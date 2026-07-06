@@ -22,15 +22,15 @@ Claude KVM is an MCP tool that controls remote desktop environments over VNC. It
 
 ## Live Test Runs
 
-- [Integration Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261661594)
-- [Mac Integration Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261487249)
-- [Mac Calculator Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261139721)
-- [Mac Scientific Calculator Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261184519)
-- [Mac Safari Browsing Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261430282)
-- [Mac Drag & Drop Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22277460796)
-- [Mac Chess Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22286270207)
-- [Mac Chess Direct Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22286704229)
-- [Mac Phantom-WG Install Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22315144741)
+- [Integration Test](https://claude-kvm.ai/artifacts/22261661594)
+- [Mac Integration Test](https://claude-kvm.ai/artifacts/22261487249)
+- [Mac Calculator Test](https://claude-kvm.ai/artifacts/22261139721)
+- [Mac Scientific Calculator Test](https://claude-kvm.ai/artifacts/22261184519)
+- [Mac Safari Browsing Test](https://claude-kvm.ai/artifacts/22261430282)
+- [Mac Drag & Drop Test](https://claude-kvm.ai/artifacts/22277460796)
+- [Mac Chess Test](https://claude-kvm.ai/artifacts/22286270207)
+- [Mac Chess Direct Test](https://claude-kvm.ai/artifacts/22286704229)
+- [Mac Phantom-WG Install Test](https://claude-kvm.ai/artifacts/22315144741)
 
 > [!NOTE]
 > Tests are conducted transparently on GitHub Actions — each step is visible in the CI environment. At the end of every test, whether the integration passes or fails, you'll find screenshots of each step the agent took during the session, along with an `.mp4` video recording that captures the entire session. By reviewing these recordings and screenshots, you can observe how the agent progressed through each stage, how long the task took, and what decisions were made based on the system prompt. You can use these examples as a reference when crafting your own system prompts or instructions for the MCP server in your own environment.
@@ -159,7 +159,7 @@ brew install claude-kvm-daemon
 > [!NOTE]
 > `claude-kvm-daemon` is compiled and code-signed via CI (GitHub Actions). The build output is packaged in two formats: a `.tar.gz` archive for Homebrew distribution and a `.dmg` disk image for notarization. The DMG is submitted to Apple servers for notarization within the same workflow — the process can be tracked from CI logs. The notarized DMG is available as a CI Artifact; the archived `.tar.gz` is also published as a release on the repository. Homebrew installation tracks this release.
 >
-> - [Release](https://github.com/ARAS-Workspace/claude-kvm/releases/tag/daemon-v1.0.1) · [Source Code](https://github.com/ARAS-Workspace/claude-kvm/tree/daemon-tool)
+> - [Release](https://github.com/ARAS-Workspace/claude-kvm/releases/tag/daemon-v1.0.2) · [Source Code](https://github.com/ARAS-Workspace/claude-kvm/tree/daemon-tool)
 > - [LibVNC Build](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22122975416) · [LibVNC Branch](https://github.com/ARAS-Workspace/claude-kvm/tree/libvnc-build)
 > - [Homebrew Tap](https://github.com/ARAS-Workspace/homebrew-tap)
 

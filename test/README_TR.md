@@ -45,8 +45,8 @@ Aşağıdaki görsel içerikler, CI ortamında VNC üzerinden gerçekleştirilen
 
 Ekran kaydı ve terminal logları [Demo Asset Üretimi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261951141) workflow'unda 4x hızlandırılarak işlenmiştir.
 
-- [Entegrasyon Testi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261661594)
-- [Demo Asset Üretimi](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261951141)
+- [Entegrasyon Testi](https://claude-kvm.ai/artifacts/22261661594)
+- [Demo Asset Üretimi](https://claude-kvm.ai/artifacts/22261951141)
 
 > [!NOTE]
 > Bu akış, süreci anlaşılır kılmak adına basit tutularak belirlenmiştir. Daha kapsamlı senaryolar alt branch'lerde ele alınacak olup, main branch üzerindeki test akışı her zaman temiz ve sade kalacaktır. Ürünün gerçek iş akışlarına nasıl dahil olduğunu görmek isterseniz bu testleri incelemenizi öneririm — aracı değerlendirme sürecinizde en etkili referans bu görüntüler olacaktır. Bununla birlikte, incelediğiniz bu döküman bundan sonra yapılacak testlerin uçtan uca test disiplinini açıkça ortaya koymaktadır.

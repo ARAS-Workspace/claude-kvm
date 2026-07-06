@@ -22,15 +22,15 @@ Claude KVM, VNC protokolü üzerinden uzak masaüstü ortamlarını kontrol eden
 
 ## Canlı Test Ortamı
 
-- [Integration Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261661594)
-- [Mac Integration Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261487249)
-- [Mac Calculator Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261139721)
-- [Mac Scientific Calculator Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261184519)
-- [Mac Safari Browsing Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22261430282)
-- [Mac Drag & Drop Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22277460796)
-- [Mac Chess Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22286270207)
-- [Mac Chess Direct Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22286704229)
-- [Mac Phantom-WG Install Test](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22315144741)
+- [Integration Test](https://claude-kvm.ai/artifacts/22261661594)
+- [Mac Integration Test](https://claude-kvm.ai/artifacts/22261487249)
+- [Mac Calculator Test](https://claude-kvm.ai/artifacts/22261139721)
+- [Mac Scientific Calculator Test](https://claude-kvm.ai/artifacts/22261184519)
+- [Mac Safari Browsing Test](https://claude-kvm.ai/artifacts/22261430282)
+- [Mac Drag & Drop Test](https://claude-kvm.ai/artifacts/22277460796)
+- [Mac Chess Test](https://claude-kvm.ai/artifacts/22286270207)
+- [Mac Chess Direct Test](https://claude-kvm.ai/artifacts/22286704229)
+- [Mac Phantom-WG Install Test](https://claude-kvm.ai/artifacts/22315144741)
 
 > [!NOTE]
 > Testler GitHub Actions üzerinde CI ortamında şeffaf biçimde yürütülmektedir — her adım aşama aşama görülebilir. Her testin sonunda, entegrasyon başarılı ya da başarısız olsun, ajanın oturum boyunca attığı her adımın ekran görüntüleri ve oturumun tamamını yansıtan `.mp4` video kaydı yer almaktadır. Bu kayıtları ve görüntüleri inceleyerek ajanın sistem komutundaki görevi hangi aşamalardan geçerek ne kadar sürede tamamladığını gözlemleyebilir, MCP sunucusunu kendi ortamınızda kullanırken buradaki örneklerden faydalanarak sistem komutunuzu veya talimatlarınızı şekillendirebilirsiniz.
@@ -159,7 +159,7 @@ brew install claude-kvm-daemon
 > [!NOTE]
 > `claude-kvm-daemon`, CI (GitHub Actions) üzerinde derlenir ve code-sign edilir. Derleme çıktısı iki formatta paketlenir: Homebrew dağıtımı için `.tar.gz` arşivi ve notarizasyon için `.dmg` disk imajı. DMG paketi aynı akış içerisinde Apple sunucularına gönderilir ve notarize edilir — süreç CI loglarından takip edilebilir. Notarize edilmiş DMG, CI Artifacts üzerinde yer alır; arşivlenen `.tar.gz` ise repo üzerinde release olarak da yayınlanır. Homebrew kurulumu bu release'i takip eder.
 >
-> - [Release](https://github.com/ARAS-Workspace/claude-kvm/releases/tag/daemon-v1.0.1) · [Kaynak Kod](https://github.com/ARAS-Workspace/claude-kvm/tree/daemon-tool)
+> - [Release](https://github.com/ARAS-Workspace/claude-kvm/releases/tag/daemon-v1.0.2) · [Kaynak Kod](https://github.com/ARAS-Workspace/claude-kvm/tree/daemon-tool)
 > - [LibVNC Build](https://github.com/ARAS-Workspace/claude-kvm/actions/runs/22122975416) · [LibVNC Branch](https://github.com/ARAS-Workspace/claude-kvm/tree/libvnc-build)
 > - [Homebrew Tap](https://github.com/ARAS-Workspace/homebrew-tap)
 
