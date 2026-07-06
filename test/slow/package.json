@@ -1,0 +1,15 @@
+{
+  "name": "claude-kvm-slow-test",
+  "private": true,
+  "description": "Agentic E2E test (Executor + Observer) for the claude-kvm daemon — MCP layer from the published claude-kvm package, daemon from source via CLAUDE_KVM_DAEMON_PATH",
+  "type": "module",
+  "scripts": {
+    "test": "node integration.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "claude-kvm": "^2.0.11",
+    "dotenv": "^17.3.1"
+  }
+}

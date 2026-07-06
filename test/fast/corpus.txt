@@ -1,0 +1,5 @@
+TEST CASE ABC
+lowercase stays lowercase
+MixedCase Words Here
+shifted symbols !@#$%^&*()_+{}|:"<>?~
+digits 0123456789 and space

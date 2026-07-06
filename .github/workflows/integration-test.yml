@@ -1,0 +1,228 @@
+# SPDX-License-Identifier: MIT
+# Claude KVM — Daemon E2E Integration Test (fast + slow)
+#
+# Based on the main branch's integration-test.yml, adapted for the daemon
+# branch: the daemon is built FROM SOURCE (not the Homebrew tap), so code
+# changes on this branch are what actually gets exercised.
+#
+# Target: a PERSISTENT droplet prepared with test/slow/build-droplet.sh
+# (hardened: power targets masked, desktop as systemd service). CI reaches
+# it via secrets — no droplet lifecycle in the workflow.
+#
+# Required secrets:
+#   TEST_VNC_HOST / TEST_VNC_PORT / TEST_VNC_PASSWORD
+#                             — from build-droplet.sh output
+#   TEST_ANTHROPIC_API_KEY    — slow test executor
+#   TEST_OPENROUTER_API_KEY   — slow test observer (optional)
+#   TEST_DROPLET_SSH_KEY      — private key for the droplet; enables the
+#                               fast test's typed.txt capture and the
+#                               screen recording.
+#
+#   fast — deterministic input test: an xterm on the droplet captures every
+#          line typed via `cat > /tmp/typed.txt`; the PC/NDJSON driver types
+#          the corpus and the result is compared byte-for-byte. No LLM.
+#          Requires TEST_DROPLET_SSH_KEY.
+#   slow — agentic Executor (Claude) + Observer (Qwen-VL) test, MCP layer
+#          from the published claude-kvm package, daemon from source via
+#          CLAUDE_KVM_DAEMON_PATH. VNC-only, no SSH needed.
+
+name: Integration Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_slow:
+        description: 'Run the agentic slow test after the fast test'
+        required: false
+        default: true
+        type: boolean
+      executor_model:
+        description: 'Executor model (Claude)'
+        required: false
+        default: 'claude-opus-4-6'
+        type: choice
+        options:
+          - claude-opus-4-6
+          - claude-sonnet-4-6
+      observer_model:
+        description: 'Observer model (OpenRouter)'
+        required: false
+        default: 'qwen/qwen3-vl-235b-a22b-instruct'
+        type: string
+      executor_max_turns:
+        description: 'Max executor turns'
+        required: false
+        default: '30'
+        type: string
+
+env:
+  TZ: Europe/Istanbul
+
+permissions: {}
+
+# ─────────────────────────────────────────────────────────────
+
+jobs:
+  integration-test:
+    runs-on: macos-26
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      # ── Build daemon from source ───────────────────────────
+
+      - name: Install build dependencies
+        run: brew install xcodegen openssl@3
+
+      - name: Build daemon
+        run: |
+          xcodegen generate
+          xcodebuild -resolvePackageDependencies \
+            -project Claude-KVM-Daemon.xcodeproj \
+            -scheme claude-kvm-daemon
+          xcodebuild \
+            -project Claude-KVM-Daemon.xcodeproj \
+            -scheme claude-kvm-daemon \
+            -configuration Release \
+            ARCHS=arm64 \
+            build
+          BUILD_DIR=$(xcodebuild \
+            -project Claude-KVM-Daemon.xcodeproj \
+            -scheme claude-kvm-daemon \
+            -configuration Release \
+            -showBuildSettings \
+            | grep -m1 'BUILT_PRODUCTS_DIR' \
+            | awk '{print $3}')
+          echo "DAEMON_BIN=$BUILD_DIR/claude-kvm-daemon" >> "$GITHUB_ENV"
+          "$BUILD_DIR/claude-kvm-daemon" --help | head -1
+
+      # ── Droplet access ─────────────────────────────────────
+
+      - name: Setup SSH key
+        id: sshkey
+        env:
+          DROPLET_SSH_KEY: ${{ secrets.TEST_DROPLET_SSH_KEY }}
+        run: |
+          if [ -n "$DROPLET_SSH_KEY" ]; then
+            printf '%s\n' "$DROPLET_SSH_KEY" > /tmp/do_key
+            chmod 600 /tmp/do_key
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "DROPLET_SSH_KEY not set — fast test and recording will be skipped"
+          fi
+
+      - name: Check VNC target
+        env:
+          VNC_HOST: ${{ secrets.TEST_VNC_HOST }}
+          VNC_PORT: ${{ secrets.TEST_VNC_PORT }}
+        run: |
+          nc -z -w 10 "$VNC_HOST" "$VNC_PORT" && echo "VNC target reachable"
+
+      - name: Start screen recording
+        if: steps.sshkey.outputs.available == 'true'
+        env:
+          VNC_HOST: ${{ secrets.TEST_VNC_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i /tmp/do_key "root@$VNC_HOST" \
+            "/usr/local/bin/start-recording.sh"
+
+      # ── Fast test (deterministic input verification) ───────
+
+      - name: 'Fast test: start capture xterm'
+        if: steps.sshkey.outputs.available == 'true'
+        env:
+          VNC_HOST: ${{ secrets.TEST_VNC_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i /tmp/do_key "root@$VNC_HOST" \
+            "rm -f /tmp/typed.txt; DISPLAY=:0 nohup xterm -geometry 220x50+0+0 \
+              -e sh -c 'cat > /tmp/typed.txt' > /tmp/xterm.log 2>&1 & sleep 2; echo xterm started"
+
+      - name: 'Fast test: drive daemon and verify'
+        if: steps.sshkey.outputs.available == 'true'
+        env:
+          VNC_HOST: ${{ secrets.TEST_VNC_HOST }}
+          VNC_PORT: ${{ secrets.TEST_VNC_PORT }}
+          VNC_PASSWORD: ${{ secrets.TEST_VNC_PASSWORD }}
+        run: |
+          python3 test/fast/driver.py "$DAEMON_BIN" "$VNC_HOST" "$VNC_PORT" \
+            test/fast/corpus.txt "$VNC_PASSWORD"
+          ssh -o StrictHostKeyChecking=no -i /tmp/do_key "root@$VNC_HOST" \
+            "cat /tmp/typed.txt" > /tmp/received.txt
+          grep -v '^$' test/fast/corpus.txt > /tmp/expected.txt
+          echo "expected:"; sed 's/^/  | /' /tmp/expected.txt
+          echo "received:"; sed 's/^/  | /' /tmp/received.txt
+          if diff /tmp/expected.txt /tmp/received.txt; then
+            echo "FAST PASS — all lines received verbatim"
+          else
+            echo "FAST FAIL — received text differs from expected"
+            exit 1
+          fi
+
+      - name: 'Fast test: close capture xterm'
+        if: always() && steps.sshkey.outputs.available == 'true'
+        env:
+          VNC_HOST: ${{ secrets.TEST_VNC_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i /tmp/do_key "root@$VNC_HOST" \
+            "pkill xterm || true; rm -f /tmp/typed.txt; sleep 1"
+
+      # ── Slow test (agentic Executor + Observer) ────────────
+
+      - name: Setup Node.js
+        if: ${{ inputs.run_slow }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: 'Slow test: install dependencies'
+        if: ${{ inputs.run_slow }}
+        working-directory: test/slow
+        run: npm ci
+
+      - name: 'Slow test: run'
+        if: ${{ inputs.run_slow }}
+        working-directory: test/slow
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.TEST_ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.TEST_OPENROUTER_API_KEY }}
+          VNC_HOST: ${{ secrets.TEST_VNC_HOST }}
+          VNC_PORT: ${{ secrets.TEST_VNC_PORT }}
+          VNC_PASSWORD: ${{ secrets.TEST_VNC_PASSWORD }}
+          CLAUDE_KVM_DAEMON_PATH: ${{ env.DAEMON_BIN }}
+          SCREENSHOTS_DIR: ../../test-screenshots
+          EXECUTOR_MODEL: ${{ inputs.executor_model || 'claude-opus-4-6' }}
+          OBSERVER_MODEL: ${{ inputs.observer_model || 'qwen/qwen3-vl-235b-a22b-instruct' }}
+          EXECUTOR_MAX_TURNS: ${{ inputs.executor_max_turns || '30' }}
+        run: |
+          mkdir -p ../../test-screenshots
+          node integration.js
+
+      # ── Cleanup (always) ───────────────────────────────────
+
+      - name: Stop recording and download
+        if: always() && steps.sshkey.outputs.available == 'true'
+        env:
+          VNC_HOST: ${{ secrets.TEST_VNC_HOST }}
+        run: |
+          mkdir -p test-screenshots
+          SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /tmp/do_key root@$VNC_HOST"
+          $SSH '/usr/local/bin/stop-recording.sh' || true
+          scp -o StrictHostKeyChecking=no -i /tmp/do_key \
+            "root@$VNC_HOST:/tmp/recording.mp4" \
+            ./test-screenshots/recording.mp4 2>/dev/null || echo "No recording file"
+          $SSH 'rm -f /tmp/recording.mp4 /tmp/ffmpeg.pid' || true
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-artifacts
+          path: test-screenshots/
+          if-no-files-found: ignore
