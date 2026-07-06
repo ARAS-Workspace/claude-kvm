@@ -169,8 +169,8 @@ func charToKeysym(_ ch: Character) -> (keysym: UInt32, shift: Bool) {
     let code = scalar.value
 
     if code >= 0x20 && code <= 0x7E {
-        if ch.isUppercase, let lower = ch.lowercased().first {
-            return (UInt32(lower.asciiValue ?? UInt8(code)), true)
+        if ch.isUppercase {
+            return (code, true)
         }
         let shiftedSymbols: [Character: UInt32] = [
             "!": 0x21, "@": 0x40, "#": 0x23, "$": 0x24, "%": 0x25,
