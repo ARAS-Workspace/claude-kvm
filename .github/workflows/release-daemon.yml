@@ -30,6 +30,8 @@ jobs:
 
   build:
     needs: extract-version
+    permissions:
+      contents: read
     uses: ./.github/workflows/build-daemon.yml
     with:
       version: ${{ needs.extract-version.outputs.version }}
